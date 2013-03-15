@@ -1,0 +1,5 @@
+python-autobahn (0.5.14-1) unstable; urgency=low
+
+  * Initial release (Closes: #702208)
+
+ -- Victor Vasiliev <vasilvv@mit.edu>  Fri, 15 Mar 2013 17:58:53 -0400

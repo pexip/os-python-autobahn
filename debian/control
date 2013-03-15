@@ -1,0 +1,21 @@
+Source: python-autobahn
+Section: python
+Priority: optional
+Maintainer: Victor Vasiliev <vasilvv@mit.edu>
+Build-Depends: debhelper (>= 8.0.0), python-all (>= 2.7.0), python-setuptools
+Standards-Version: 3.9.3
+Homepage: http://autobahn.ws/python
+
+Package: python-autobahn
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-twisted (>= 11.1.0), python-pbkdf2
+Description: WebSocket/WAMP implementation for Python/Twisted
+ WebSocket is a protocol which allows web applications to have a two-way
+ channel with the server. Twisted is an event-based internet application
+ framework for Python. Autobahn allows Twisted applications to act as
+ a WebSocket client and as a WebSocket server.
+ .
+ It also supports WebSocket Application Messaging Protocol (WAMP), an open
+ WebSocket-based protocol which provides a support for higher-level messaging
+ patterns: Remote Procedure Call and Publish/Subscribe.
+
