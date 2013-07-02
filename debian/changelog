@@ -1,3 +1,9 @@
+python-autobahn (0.5.14-1pexip1) precise; urgency=low
+
+  * Package for Pexip.
+
+ -- Alan Ford <alan@pexip.com>  Tue, 02 Jul 2013 14:12:08 +0100
+
 python-autobahn (0.5.14-1) unstable; urgency=low
 
   * Initial release (Closes: #702208)

@@ -1,8 +1,9 @@
 Source: python-autobahn
 Section: python
 Priority: optional
-Maintainer: Victor Vasiliev <vasilvv@mit.edu>
-Build-Depends: debhelper (>= 8.0.0), python-all (>= 2.7.0), python-setuptools
+Maintainer: Pexip AS <packaging@pexip.com>
+XBCS-Original-Maintainer: Victor Vasiliev <vasilvv@mit.edu>
+Build-Depends: debhelper (>= 8.0.0), python (>= 2.7.0), python-setuptools
 Standards-Version: 3.9.3
 Homepage: http://autobahn.ws/python
 
