@@ -1,0 +1,15 @@
+--- a/autobahn/websocket.py	2014-01-23 23:54:43.236590005 +0000
++++ b/autobahn/websocket.py	2014-01-23 23:54:48.664494588 +0000
+@@ -2562,8 +2562,10 @@
+          if http_headers_cnt["host"] > 1:
+             return self.failHandshake("HTTP Host header appears more than once in opening handshake request")
+          self.http_request_host = self.http_headers["host"].strip()
+-         if self.http_request_host.find(":") >= 0:
+-            (h, p) = self.http_request_host.split(":")
++         last_colon = self.http_request_host.rfind(":")
++         ipv6_sans_port = (self.http_request_host and self.http_request_host[0] ==  '[' and self.http_request_host[-1] == ']')
++         if last_colon >= 0 and not ipv6_sans_port:
++            (h, _, p) = self.http_request_host.rpartition(":")
+             try:
+                port = int(str(p.strip()))
+             except:

@@ -1,3 +1,9 @@
+python-autobahn (0.5.14-1pexip2) pexip; urgency=low
+
+  * Add patch which fixes handling of IPv6 in the Host header.
+
+ -- John-Mark Bell <jmb@pexip.com>  Fri, 24 Jan 2014 00:16:23 +0000
+
 python-autobahn (0.5.14-1pexip1) precise; urgency=low
 
   * Package for Pexip.
