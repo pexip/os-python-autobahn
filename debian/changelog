@@ -1,0 +1,156 @@
+python-autobahn (17.10.1+dfsg1-7) unstable; urgency=high
+
+  * CVE-2020-35678: allows redirect header injection. Applied upstream patch:
+    URL must be re-encoded when doing redirect (Closes: #978416).
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 07 Jun 2021 09:49:43 +0200
+
+python-autobahn (17.10.1+dfsg1-6) unstable; urgency=medium
+
+  * Removed Python 2 support (Closes: #937590).
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 10 Sep 2019 12:10:34 +0200
+
+python-autobahn (17.10.1+dfsg1-5) unstable; urgency=medium
+
+  [ Ondřej Nový ]
+  * Running wrap-and-sort -bast.
+  * Use debhelper-compat instead of debian/compat.
+
+  [ Thomas Goirand ]
+  * Re-upload source-only.
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 05 Aug 2019 10:56:41 +0200
+
+python-autobahn (17.10.1+dfsg1-4) unstable; urgency=medium
+
+  [ Ondřej Nový ]
+  * d/control: Use team+openstack@tracker.debian.org as maintainer
+
+  [ Thomas Goirand ]
+  * Use pyqrcode, not just qrcode (Closes: #931612).
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 08 Jul 2019 11:39:13 +0200
+
+python-autobahn (17.10.1+dfsg1-3) unstable; urgency=medium
+
+  * Fixed upstream VCS URL in debian/rules.
+  * Add Python 3.7 patch (Closes: #903423).
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 10 Jul 2018 09:02:46 +0200
+
+python-autobahn (17.10.1+dfsg1-2) unstable; urgency=medium
+
+  * Uploading to unstable.
+
+ -- Thomas Goirand <zigo@debian.org>  Sun, 25 Feb 2018 20:38:09 +0000
+
+python-autobahn (17.10.1+dfsg1-1) experimental; urgency=medium
+
+  [ Ondřej Nový ]
+  * d/control: Set Vcs-* to salsa.debian.org
+
+  [ Thomas Goirand ]
+  * New upstream release.
+  * Removed python-msgpack from (build-)depends, upstream now uses u-msgpack.
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 22 Feb 2018 13:17:17 +0000
+
+python-autobahn (17.7.1+dfsg1-3) unstable; urgency=medium
+
+  * Uploading to unstable.
+  * Do not runtime depends on python3-trollius anymore (Closes: #868203).
+  * Using debhelper 10.
+  * Standards-Version is now 4.1.1.
+
+ -- Thomas Goirand <zigo@debian.org>  Sun, 29 Oct 2017 17:33:10 +0100
+
+python-autobahn (17.7.1+dfsg1-2) experimental; urgency=medium
+
+  * Added missing openstack-pkg-tools build-dep (Closes: #876235).
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 20 Sep 2017 21:03:16 +0000
+
+python-autobahn (17.7.1+dfsg1-1) experimental; urgency=medium
+
+  [ Daniel Baumann ]
+  * Updating vcs fields.
+  * Updating copyright format url.
+  * Updating maintainer field.
+  * Running wrap-and-sort -bast.
+  * Updating standards version to 4.0.0.
+  * Removing gbp.conf, not used anymore or should be specified in the
+    developers dotfiles.
+  * Updating standards version to 4.0.1.
+  * Updating standards version to 4.1.0.
+
+  [ Thomas Goirand ]
+  * New upstream release.
+  * Updated debian/copyright.
+  * Fixed (build-)depends for this release.
+  * Now using pkgos-dh_auto_install.
+  * Removed Work-around_old_vs._new_twisted_client-endpoint_parser.patch
+    applied upstream.
+  * Fixed tests to run in the autobahn folder only.
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 13 Sep 2017 21:21:45 +0200
+
+python-autobahn (0.10.3+dfsg1-7) unstable; urgency=medium
+
+  * Added missing build-depends-indep: python3-mock (Closes: #825166).
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 24 May 2016 13:29:12 +0000
+
+python-autobahn (0.10.3+dfsg1-6) unstable; urgency=medium
+
+  [ Ondřej Nový ]
+  * d/rules: Changed UPSTREAM_GIT protocol to https
+  * d/copyright: Changed source URL to https protocol
+
+  [ Thomas Goirand ]
+  * Added Python3 support (Closes: #822186).
+  * Standards-Version is now 3.9.8 (no change).
+  * Fix debian/copyright after upstream relicensed to Expat.
+
+ -- Thomas Goirand <zigo@debian.org>  Fri, 20 May 2016 13:21:58 +0000
+
+python-autobahn (0.10.3+dfsg1-5) unstable; urgency=medium
+
+  * Stop using py.test-X.Y (Closes: #814846).
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 17 Feb 2016 05:57:17 +0000
+
+python-autobahn (0.10.3+dfsg1-4) unstable; urgency=medium
+
+  * Do not break python-twisted 15.x: applied upstream patch. (Closes: #810155)
+  * VCS fields using HTTPS urls.
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 17 Feb 2016 05:07:10 +0000
+
+python-autobahn (0.10.3+dfsg1-3) unstable; urgency=medium
+
+  * Removed Victor Vasiliev <vasilvv@mit.edu> from uploaders (Closes: #795882).
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 14 Sep 2015 10:54:20 +0000
+
+python-autobahn (0.10.3+dfsg1-2) unstable; urgency=medium
+
+  * Uploading to unstable.
+
+ -- Thomas Goirand <zigo@debian.org>  Fri, 01 May 2015 13:47:56 +0200
+
+python-autobahn (0.10.3+dfsg1-1) experimental; urgency=medium
+
+  * New upstream release. (Closes: #780061, #730796)
+  * Now team maintaining the package within the OpenStack team, added Victor as
+    uploader, set VCS URLs (see #780061 where Victor agrees with this).
+  * Now running unit tests at build time.
+  * Package is now +dfsg1 because of non-free files in the example folder.
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 21 Apr 2015 10:42:55 +0200
+
+python-autobahn (0.5.14-1) unstable; urgency=low
+
+  * Initial release (Closes: #702208)
+
+ -- Victor Vasiliev <vasilvv@mit.edu>  Fri, 15 Mar 2013 17:58:53 -0400

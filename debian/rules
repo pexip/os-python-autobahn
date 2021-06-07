@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+UPSTREAM_GIT := https://github.com/crossbario/autobahn-python
+include /usr/share/openstack-pkg-tools/pkgos.make
+
+%:
+	dh $@ --buildsystem=python_distutils --with python3
+
+override_dh_auto_clean:
+	rm -rf build .stestr
+	find . -iname '*.pyc' -delete
+	for i in $$(find . -type d -iname __pycache__) ; do rm -rf $$i ; done
+
+override_dh_auto_build:
+	echo "Do nothing..."
+
+override_dh_auto_install:
+	pkgos-dh_auto_install --no-py2
+
+override_dh_auto_test:
+ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+	set -e ; set -x ; for i in $(PYTHON3S) ; do \
+		rm -rf build ; \
+		PYTHONPATH=. python$$i -m pytest autobahn ; \
+	done
+endif
+
+override_dh_clean:
+	dh_clean -O--buildsystem=python_distutils
+	rm -rf build twisted/plugins/dropin.cache
