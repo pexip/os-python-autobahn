@@ -42,20 +42,11 @@ XS-Pexip-Upstream: http://ftp.debian.org/debian/ bullseye
 Package: python3-autobahn
 Architecture: all
 Depends:
- python3-cbor (>= 1.0.0),
- python3-lz4,
- python3-nacl,
  python3-openssl,
- python3-pyqrcode,
  python3-service-identity,
  python3-six,
- python3-snappy,
- python3-trie,
  python3-twisted,
  python3-txaio,
- python3-u-msgpack,
- python3-ubjson,
- python3-wsaccel,
  python3-zope.interface,
  ${misc:Depends},
  ${python3:Depends},
