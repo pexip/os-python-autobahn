@@ -1,3 +1,9 @@
+python-autobahn (17.10.1+dfsg1-7pexip1) pexip; urgency=medium
+
+  * Prepare Pexip packaging
+
+ -- Huw Jones <huw@pexip.com>  Mon, 14 Jun 2021 11:24:35 +0000
+
 python-autobahn (17.10.1+dfsg1-7) unstable; urgency=high
 
   * CVE-2020-35678: allows redirect header injection. Applied upstream patch:
