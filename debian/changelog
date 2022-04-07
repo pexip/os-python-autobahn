@@ -1,3 +1,9 @@
+python-autobahn (17.10.1+dfsg1-7pexip3) pexip; urgency=medium
+
+  * Rebuild to move module to main.
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Thu, 07 Apr 2022 07:55:20 +0000
+
 python-autobahn (17.10.1+dfsg1-7pexip2) pexip; urgency=medium
 
   * Remove extra deps
