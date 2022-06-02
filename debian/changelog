@@ -1,3 +1,9 @@
+python-autobahn (17.10.1+dfsg1-7pexip4) pexip; urgency=medium
+
+  * Initial bullseye build
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Thu, 02 Jun 2022 14:42:45 +0100
+
 python-autobahn (17.10.1+dfsg1-7pexip3) pexip; urgency=medium
 
   * Rebuild to move module to main.
