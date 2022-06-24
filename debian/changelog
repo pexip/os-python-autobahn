@@ -1,3 +1,9 @@
+python-autobahn (17.10.1+dfsg1-7pexip5) pexip-bullseye; urgency=medium
+
+  * Main bullseye build
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Fri, 24 Jun 2022 14:04:17 +0100
+
 python-autobahn (17.10.1+dfsg1-7pexip4) pexip; urgency=medium
 
   * Initial bullseye build
