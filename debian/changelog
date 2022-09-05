@@ -1,3 +1,9 @@
+python-autobahn (17.10.1+dfsg1-7pexip6) pexip-bullseye; urgency=medium
+
+  * Bullseye rebuild for ARM64 inclusion
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Mon, 05 Sep 2022 10:35:14 +0100
+
 python-autobahn (17.10.1+dfsg1-7pexip5) pexip-bullseye; urgency=medium
 
   * Main bullseye build
