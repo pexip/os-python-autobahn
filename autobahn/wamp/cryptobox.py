@@ -24,9 +24,6 @@
 #
 ###############################################################################
 
-from __future__ import absolute_import
-
-import six
 
 from autobahn.util import public
 from autobahn.wamp.interfaces import IPayloadCodec
@@ -41,7 +38,7 @@ __all__ = [
 
 try:
     # try to import everything we need for WAMP-cryptobox
-    from nacl.encoding import Base64Encoder, RawEncoder
+    from nacl.encoding import Base64Encoder, RawEncoder, HexEncoder
     from nacl.public import PrivateKey, PublicKey, Box
     from nacl.utils import random
     from pytrie import StringTrie
@@ -111,6 +108,14 @@ if HAS_CRYPTOBOX:
                 raise Exception("insufficient keys provided for at least originator or responder role")
 
     @public
+    class SymKey(object):
+        """
+        Holds a symmetric key for an URI.
+        """
+        def __init__(self, raw=None):
+            pass
+
+    @public
     class KeyRing(object):
         """
         A keyring holds (cryptobox) public-private key pairs for use with WAMP-cryptobox payload
@@ -124,9 +129,9 @@ if HAS_CRYPTOBOX:
 
             Create a new key ring to hold public and private keys mapped from an URI space.
             """
-            assert(default_key is None or isinstance(default_key, Key) or type(default_key == six.text_type))
+            assert(default_key is None or isinstance(default_key, Key) or type(default_key == str))
             self._uri_to_key = StringTrie()
-            if type(default_key) == six.text_type:
+            if type(default_key) == str:
                 default_key = Key(originator_priv=default_key, responder_priv=default_key)
             self._default_key = default_key
 
@@ -139,18 +144,29 @@ if HAS_CRYPTOBOX:
             key = PrivateKey.generate()
             priv_key = key.encode(encoder=Base64Encoder)
             pub_key = key.public_key.encode(encoder=Base64Encoder)
-            return (u'{}'.format(priv_key), u'{}'.format(pub_key))
+            return priv_key.decode('ascii'), pub_key.decode('ascii')
+
+        @public
+        def generate_key_hex(self):
+            """
+            Generate a new private key and return a pair with the hex encodings
+            of (priv_key, pub_key).
+            """
+            key = PrivateKey.generate()
+            priv_key = key.encode(encoder=HexEncoder)
+            pub_key = key.public_key.encode(encoder=HexEncoder)
+            return priv_key.decode('ascii'), pub_key.decode('ascii')
 
         @public
         def set_key(self, uri, key):
             """
             Add a key set for a given URI.
             """
-            assert(type(uri) == six.text_type)
-            assert(key is None or isinstance(key, Key) or type(key) == six.text_type)
-            if type(key) == six.text_type:
+            assert(type(uri) == str)
+            assert(key is None or isinstance(key, Key) or type(key) == str)
+            if type(key) == str:
                 key = Key(originator_priv=key, responder_priv=key)
-            if uri == u'':
+            if uri == '':
                 self._default_key = key
             else:
                 if key is None:
@@ -158,6 +174,14 @@ if HAS_CRYPTOBOX:
                         del self._uri_to_key[uri]
                 else:
                     self._uri_to_key[uri] = key
+
+        @public
+        def rotate_key(self, uri):
+            assert(type(uri) == str)
+            if uri in self._uri_to_key:
+                self._uri_to_key[uri].rotate()
+            else:
+                self._uri_to_key[uri].rotate()
 
         def _get_box(self, is_originating, uri, match_exact=False):
             try:
@@ -183,7 +207,7 @@ if HAS_CRYPTOBOX:
             if the URI should not be encrypted.
             """
             assert(type(is_originating) == bool)
-            assert(type(uri) == six.text_type)
+            assert(type(uri) == str)
             assert(args is None or type(args) in (list, tuple))
             assert(kwargs is None or type(kwargs) == dict)
 
@@ -195,9 +219,9 @@ if HAS_CRYPTOBOX:
                 return None
 
             payload = {
-                u'uri': uri,
-                u'args': args,
-                u'kwargs': kwargs
+                'uri': uri,
+                'args': args,
+                'kwargs': kwargs
             }
             nonce = random(Box.NONCE_SIZE)
             payload_ser = _json_dumps(payload).encode('utf8')
@@ -210,16 +234,16 @@ if HAS_CRYPTOBOX:
             payload_bytes = bytes(payload_encr)
             payload_key = None
 
-            return EncodedPayload(payload_bytes, u'cryptobox', u'json', enc_key=payload_key)
+            return EncodedPayload(payload_bytes, 'cryptobox', 'json', enc_key=payload_key)
 
         @public
         def decode(self, is_originating, uri, encoded_payload):
             """
             Decrypt the given WAMP URI and EncodedPayload into a tuple ``(uri, args, kwargs)``.
             """
-            assert(type(uri) == six.text_type)
+            assert(type(uri) == str)
             assert(isinstance(encoded_payload, EncodedPayload))
-            assert(encoded_payload.enc_algo == u'cryptobox')
+            assert(encoded_payload.enc_algo == 'cryptobox')
 
             box = self._get_box(is_originating, uri)
 
@@ -228,14 +252,14 @@ if HAS_CRYPTOBOX:
 
             payload_ser = box.decrypt(encoded_payload.payload, encoder=RawEncoder)
 
-            if encoded_payload.enc_serializer != u'json':
+            if encoded_payload.enc_serializer != 'json':
                 raise Exception("received encrypted payload, but don't know how to process serializer '{}'".format(encoded_payload.enc_serializer))
 
             payload = _json_loads(payload_ser.decode('utf8'))
 
-            uri = payload.get(u'uri', None)
-            args = payload.get(u'args', None)
-            kwargs = payload.get(u'kwargs', None)
+            uri = payload.get('uri', None)
+            args = payload.get('args', None)
+            kwargs = payload.get('kwargs', None)
 
             return uri, args, kwargs
 

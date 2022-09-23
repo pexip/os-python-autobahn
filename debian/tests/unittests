@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+set -x
+export OSLO_PACKAGE_VERSION=$(dpkg-parsechangelog -SVersion | sed -e 's/^[[:digit:]]*://' -e 's/[-].*//' -e 's/~git.*//' -e 's/~/.0/' -e 's/+dfsg1//' -e 's/+ds1//' | head -n 1)
+
+CWD=$(pwd)
+PYTHON3S=$(py3versions -vs)
+for i in ${PYTHON3S} ; do
+	python${i} setup.py install --install-layout=deb --root ${CWD}/debian/tmp
+	PYTHONPATH=${CWD}/debian/tmp/usr/lib/python3/dist-packages \
+		python$i -m pytest -Wignore -v --ignore=./autobahn/twisted --ignore=./autobahn/wamp --ignore=./autobahn/websocket --ignore=./autobahn/xbr autobahn
+done

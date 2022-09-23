@@ -14,6 +14,10 @@ Site Contents
    asynchronous-programming
    websocket/programming
    wamp/programming
+   wamp/aio-repl
+   xbr
+   xbr-cli
+   xbr-auth
    websocket/examples
    wamp/examples
    reference/autobahn

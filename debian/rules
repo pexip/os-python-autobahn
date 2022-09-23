@@ -3,6 +3,13 @@
 UPSTREAM_GIT := https://github.com/crossbario/autobahn-python
 include /usr/share/openstack-pkg-tools/pkgos.make
 
+# Needed for tests:
+export PYUBJSON_NO_EXTENSION=1
+export AUTOBAHN_USE_NVX=0
+export AUTOBAHN_USE_UJSON=1
+export AUTOBAHN_USE_CBOR2=0
+export USE_ASYNCIO=1
+
 %:
 	dh $@ --buildsystem=python_distutils --with python3
 
@@ -15,16 +22,19 @@ override_dh_auto_build:
 	echo "Do nothing..."
 
 override_dh_auto_install:
-	pkgos-dh_auto_install --no-py2
+	pkgos-dh_auto_install --no-py2 --in-tmp
 
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 	set -e ; set -x ; for i in $(PYTHON3S) ; do \
 		rm -rf build ; \
-		PYTHONPATH=. python$$i -m pytest autobahn ; \
+		PYTHONPATH=. python$$i -m pytest -Wignore -v --ignore=./autobahn/twisted --ignore=./autobahn/wamp --ignore=./autobahn/websocket --ignore=./autobahn/xbr autobahn; \
 	done
 endif
 
 override_dh_clean:
 	dh_clean -O--buildsystem=python_distutils
 	rm -rf build twisted/plugins/dropin.cache
+
+override_dh_python3:
+	dh_python3 --shebang=/usr/bin/python3

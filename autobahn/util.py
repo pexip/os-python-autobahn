@@ -23,9 +23,7 @@
 # THE SOFTWARE.
 #
 ###############################################################################
-
-from __future__ import absolute_import
-
+import inspect
 import os
 import time
 import struct
@@ -35,13 +33,22 @@ import base64
 import math
 import random
 import binascii
+import socket
+import subprocess
+from collections import OrderedDict
+
+from typing import Optional
 from datetime import datetime, timedelta
 from pprint import pformat
 from array import array
 
-import six
-
 import txaio
+
+try:
+    _TLS = True
+    from OpenSSL import SSL
+except ImportError:
+    _TLS = False
 
 
 __all__ = ("public",
@@ -61,7 +68,18 @@ __all__ = ("public",
            "generate_token",
            "generate_activation_code",
            "generate_serial_number",
-           "generate_user_password")
+           "generate_user_password",
+           "machine_id",
+           'parse_keyfile',
+           'write_keyfile',
+           "hl",
+           "hltype",
+           "hlid",
+           "hluserid",
+           "hlval",
+           "hlcontract",
+           "with_0x",
+           "without_0x")
 
 
 def public(obj):
@@ -101,8 +119,8 @@ def encode_truncate(text, limit, encoding='utf8', return_encoded=True):
     :returns: The truncated string.
     :rtype: str or bytes
     """
-    assert(text is None or type(text) == six.text_type)
-    assert(type(limit) in six.integer_types)
+    assert(text is None or type(text) == str)
+    assert(type(limit) == int)
     assert(limit >= 0)
 
     if text is None:
@@ -130,21 +148,18 @@ def encode_truncate(text, limit, encoding='utf8', return_encoded=True):
 
 
 @public
-def xor(d1, d2):
+def xor(d1: bytes, d2: bytes) -> bytes:
     """
     XOR two binary strings of arbitrary (equal) length.
 
     :param d1: The first binary string.
-    :type d1: binary
     :param d2: The second binary string.
-    :type d2: binary
 
     :returns: XOR of the binary strings (``XOR(d1, d2)``)
-    :rtype: bytes
     """
-    if type(d1) != six.binary_type:
+    if type(d1) != bytes:
         raise Exception("invalid type {} for d1 - must be binary".format(type(d1)))
-    if type(d2) != six.binary_type:
+    if type(d2) != bytes:
         raise Exception("invalid type {} for d2 - must be binary".format(type(d2)))
     if len(d1) != len(d2):
         raise Exception("cannot XOR binary string of differing length ({} != {})".format(len(d1), len(d2)))
@@ -155,10 +170,7 @@ def xor(d1, d2):
     for i in range(len(d1)):
         d1[i] ^= d2[i]
 
-    if six.PY3:
-        return d1.tobytes()
-    else:
-        return d1.tostring()
+    return d1.tobytes()
 
 
 @public
@@ -169,6 +181,11 @@ def utcstr(ts=None):
     Note: to parse an ISO 8601 formatted string, use the **iso8601**
     module instead (e.g. ``iso8601.parse_date("2014-05-23T13:03:44.123Z")``).
 
+    >>> txaio.time_ns()
+    1641121311914026419
+    >>> int(iso8601.parse_date(utcnow()).timestamp() * 1000000000.)
+    1641121313209000192
+
     :param ts: The timestamp to format.
     :type ts: instance of :py:class:`datetime.datetime` or ``None``
 
@@ -178,7 +195,7 @@ def utcstr(ts=None):
     assert(ts is None or isinstance(ts, datetime))
     if ts is None:
         ts = datetime.utcnow()
-    return u"{0}Z".format(ts.strftime(u"%Y-%m-%dT%H:%M:%S.%f")[:-3])
+    return "{0}Z".format(ts.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3])
 
 
 @public
@@ -327,16 +344,16 @@ def newid(length=16):
 
 # we take out the following 9 chars (leaving 27), because there
 # is visual ambiguity: 0/O/D, 1/I, 8/B, 2/Z
-DEFAULT_TOKEN_CHARS = u'345679ACEFGHJKLMNPQRSTUVWXY'
+DEFAULT_TOKEN_CHARS = '345679ACEFGHJKLMNPQRSTUVWXY'
 """
 Default set of characters to create rtokens from.
 """
 
-DEFAULT_ZBASE32_CHARS = u'13456789abcdefghijkmnopqrstuwxyz'
+DEFAULT_ZBASE32_CHARS = '13456789abcdefghijkmnopqrstuwxyz'
 """
 Our choice of confusing characters to eliminate is: `0', `l', `v', and `2'.  Our
 reasoning is that `0' is potentially mistaken for `o', that `l' is potentially
-mistaken for `1' or `i', that `v' is potentially mistaken for `u' or `r'
+mistaken for `1' or `i', that `v' is potentially mistaken for `' or `r'
 (especially in handwriting) and that `2' is potentially mistaken for `z'
 (especially in handwriting).
 
@@ -350,7 +367,11 @@ Delta" and telephone operators' "Is that 'd' as in 'dog'?".
 
 
 @public
-def generate_token(char_groups, chars_per_group, chars=None, sep=None, lower_case=False):
+def generate_token(char_groups: int,
+                   chars_per_group: int,
+                   chars: Optional[str] = None,
+                   sep: Optional[str] = None,
+                   lower_case: Optional[bool] = False) -> str:
     """
     Generate cryptographically strong tokens, which are strings like `M6X5-YO5W-T5IK`.
     These can be used e.g. for used-only-once activation tokens or the like.
@@ -380,35 +401,25 @@ def generate_token(char_groups, chars_per_group, chars=None, sep=None, lower_cas
     * token(6): ``NXW9-74LU-6NUH-VLPV-X6AG-QUE3``
 
     :param char_groups: Number of character groups (or characters if chars_per_group == 1).
-    :type char_groups: int
-
     :param chars_per_group: Number of characters per character group (or 1 to return a token with no grouping).
-    :type chars_per_group: int
-
     :param chars: Characters to choose from. Default is 27 character subset
         of the ISO basic Latin alphabet (see: ``DEFAULT_TOKEN_CHARS``).
-    :type chars: str or None
-
     :param sep: When separating groups in the token, the separater string.
-    :type sep: str
-
     :param lower_case: If ``True``, generate token in lower-case.
-    :type lower_case: bool
 
     :returns: The generated token.
-    :rtype: str
     """
-    assert(type(char_groups) in six.integer_types)
-    assert(type(chars_per_group) in six.integer_types)
-    assert(chars is None or type(chars) == six.text_type)
+    assert(type(char_groups) == int)
+    assert(type(chars_per_group) == int)
+    assert(chars is None or type(chars) == str), 'chars must be str, was {}'.format(type(chars))
     chars = chars or DEFAULT_TOKEN_CHARS
     if lower_case:
         chars = chars.lower()
-    sep = sep or u'-'
+    sep = sep or '-'
     rng = random.SystemRandom()
-    token_value = u''.join(rng.choice(chars) for _ in range(char_groups * chars_per_group))
+    token_value = ''.join(rng.choice(chars) for _ in range(char_groups * chars_per_group))
     if chars_per_group > 1:
-        return sep.join(map(u''.join, zip(*[iter(token_value)] * chars_per_group)))
+        return sep.join(map(''.join, zip(*[iter(token_value)] * chars_per_group)))
     else:
         return token_value
 
@@ -416,37 +427,56 @@ def generate_token(char_groups, chars_per_group, chars=None, sep=None, lower_cas
 @public
 def generate_activation_code():
     """
-    Generate a one-time activation code or token of the form ``u'W97F-96MJ-YGJL'``.
+    Generate a one-time activation code or token of the form ``'W97F-96MJ-YGJL'``.
     The generated value is cryptographically strong and has (at least) 57 bits of entropy.
 
     :returns: The generated activation code.
     :rtype: str
     """
-    return generate_token(char_groups=3, chars_per_group=4, chars=DEFAULT_TOKEN_CHARS, sep=u'-', lower_case=False)
+    return generate_token(char_groups=3, chars_per_group=4, chars=DEFAULT_TOKEN_CHARS, sep='-', lower_case=False)
+
+
+_PAT_ACTIVATION_CODE = re.compile('^([' + DEFAULT_TOKEN_CHARS + ']{4,4})-([' + DEFAULT_TOKEN_CHARS + ']{4,4})-([' + DEFAULT_TOKEN_CHARS + ']{4,4})$')
+
+
+@public
+def parse_activation_code(code: str):
+    """
+    Parse an activation code generated by :func:<autobahn.util.generate_activation_code>:
+
+    .. code:: console
+
+        "RWCN-94NV-CEHR" -> ("RWCN", "94NV", "CEHR") | None
+
+    :param code: The code to parse, e.g. ``'W97F-96MJ-YGJL'``.
+    :return: If the string is a properly conforming activation code, return
+        the matched pattern, otherwise return ``None``.
+    """
+    return _PAT_ACTIVATION_CODE.match(code)
 
 
 @public
 def generate_user_password():
     """
-    Generate a secure, random user password of the form ``u'kgojzi61dn5dtb6d'``.
+    Generate a secure, random user password of the form ``'kgojzi61dn5dtb6d'``.
     The generated value is cryptographically strong and has (at least) 76 bits of entropy.
 
     :returns: The generated password.
     :rtype: str
     """
-    return generate_token(char_groups=16, chars_per_group=1, chars=DEFAULT_ZBASE32_CHARS, sep=u'-', lower_case=True)
+    return generate_token(char_groups=16, chars_per_group=1, chars=DEFAULT_ZBASE32_CHARS, sep='-', lower_case=True)
 
 
 @public
 def generate_serial_number():
     """
-    Generate a globally unique serial / product code of the form ``u'YRAC-EL4X-FQQE-AW4T-WNUV-VN6T'``.
+    Generate a globally unique serial / product code of the form ``'YRAC-EL4X-FQQE-AW4T-WNUV-VN6T'``.
     The generated value is cryptographically strong and has (at least) 114 bits of entropy.
 
     :returns: The generated serial number / product code.
     :rtype: str
     """
-    return generate_token(char_groups=6, chars_per_group=4, chars=DEFAULT_TOKEN_CHARS, sep=u'-', lower_case=False)
+    return generate_token(char_groups=6, chars_per_group=4, chars=DEFAULT_TOKEN_CHARS, sep='-', lower_case=False)
 
 
 # Select the most precise walltime measurement function available
@@ -457,7 +487,10 @@ if sys.platform.startswith('win'):
     # first call to this function, as a floating point number, based on the
     # Win32 function QueryPerformanceCounter(). The resolution is typically
     # better than one microsecond
-    _rtime = time.clock
+    if sys.version_info >= (3, 8):
+        _rtime = time.perf_counter
+    else:
+        _rtime = time.clock
     _ = _rtime()  # this starts wallclock
 else:
     # On Unix-like platforms, this used the first available from this list:
@@ -706,7 +739,7 @@ def wildcards2patterns(wildcards):
     # match. Without this, e.g. a prefix will match:
     # re.match('.*good\\.com', 'good.com.evil.com')  # match!
     # re.match('.*good\\.com$', 'good.com.evil.com') # no match!
-    return [re.compile('^' + wc.replace('.', '\.').replace('*', '.*') + '$') for wc in wildcards]
+    return [re.compile('^' + wc.replace('.', r'\.').replace('*', '.*') + '$') for wc in wildcards]
 
 
 class ObservableMixin(object):
@@ -727,6 +760,7 @@ class ObservableMixin(object):
     _parent = None
     _valid_events = None
     _listeners = None
+    _results = None
 
     def set_valid_events(self, valid_events=None):
         """
@@ -734,6 +768,7 @@ class ObservableMixin(object):
             not listed in valid_events raises an exception.
         """
         self._valid_events = list(valid_events)
+        self._results = {k: None for k in self._valid_events}
 
     def _check_event(self, event):
         """
@@ -792,7 +827,10 @@ class ObservableMixin(object):
                 if handler is None:
                     del self._listeners[event]
                 else:
-                    self._listeners[event].discard(handler)
+                    try:
+                        self._listeners[event].remove(handler)
+                    except ValueError:
+                        pass
 
     def fire(self, event, *args, **kwargs):
         """
@@ -815,7 +853,9 @@ class ObservableMixin(object):
             res.append(future)
         if self._parent is not None:
             res.append(self._parent.fire(event, *args, **kwargs))
-        return txaio.gather(res, consume_exceptions=False)
+        d_res = txaio.gather(res, consume_exceptions=False)
+        self._results[event] = d_res
+        return d_res
 
 
 class _LazyHexFormatter(object):
@@ -835,3 +875,170 @@ class _LazyHexFormatter(object):
 
     def __str__(self):
         return binascii.hexlify(self.obj).decode('ascii')
+
+
+def _is_tls_error(instance):
+    """
+    :returns: True if we have TLS support and 'instance' is an
+        instance of :class:`OpenSSL.SSL.Error` otherwise False
+    """
+    if _TLS:
+        return isinstance(instance, SSL.Error)
+    return False
+
+
+def _maybe_tls_reason(instance):
+    """
+    :returns: a TLS error-message, or empty-string if 'instance' is
+        not a TLS error.
+    """
+    if _is_tls_error(instance):
+        ssl_error = instance.args[0][0]
+        return "SSL error: {msg} (in {func})".format(
+            func=ssl_error[1],
+            msg=ssl_error[2],
+        )
+    return ""
+
+
+def machine_id() -> str:
+    """
+    For informational purposes, get a unique ID or serial for this machine (device).
+
+    :returns: Unique machine (device) ID (serial), e.g. ``81655b901e334fc1ad59cbf2719806b7``.
+    """
+    from twisted.python.runtime import platform
+
+    if platform.isLinux():
+        try:
+            # why this? see: http://0pointer.de/blog/projects/ids.html
+            with open('/var/lib/dbus/machine-id', 'r') as f:
+                return f.read().strip()
+        except:
+            # Non-dbus using Linux, get a hostname
+            return socket.gethostname()
+    elif platform.isMacOSX():
+        import plistlib
+        plist_data = subprocess.check_output(["ioreg", "-rd1", "-c", "IOPlatformExpertDevice", "-a"])
+        return plistlib.loads(plist_data)[0]["IOPlatformSerialNumber"]
+    else:
+        return socket.gethostname()
+
+
+try:
+    import click
+    _HAS_CLICK = True
+except ImportError:
+    _HAS_CLICK = False
+
+
+def hl(text, bold=False, color='yellow'):
+    if not isinstance(text, str):
+        text = '{}'.format(text)
+    if _HAS_CLICK:
+        return click.style(text, fg=color, bold=bold)
+    else:
+        return text
+
+
+def _qn(obj):
+    if inspect.isclass(obj) or inspect.isfunction(obj) or inspect.ismethod(obj):
+        qn = '{}.{}'.format(obj.__module__, obj.__qualname__)
+    else:
+        qn = 'unknown'
+    return qn
+
+
+def hltype(obj):
+    qn = _qn(obj).split('.')
+    text = hl(qn[0], color='yellow', bold=True) + hl('.' + '.'.join(qn[1:]), color='yellow', bold=False)
+    return '<' + text + '>'
+
+
+def hlid(oid):
+    return hl('{}'.format(oid), color='blue', bold=True)
+
+
+def hluserid(oid):
+    if not isinstance(oid, str):
+        oid = '{}'.format(oid)
+    return hl('"{}"'.format(oid), color='yellow', bold=True)
+
+
+def hlval(val, color='white', bold=True):
+    return hl('{}'.format(val), color=color, bold=bold)
+
+
+def hlcontract(oid):
+    if not isinstance(oid, str):
+        oid = '{}'.format(oid)
+    return hl('<{}>'.format(oid), color='magenta', bold=True)
+
+
+def with_0x(address):
+    if address and not address.startswith('0x'):
+        return '0x{address}'.format(address=address)
+    return address
+
+
+def without_0x(address):
+    if address and address.startswith('0x'):
+        return address[2:]
+    return address
+
+
+def write_keyfile(filepath, tags, msg):
+    """
+    Internal helper, write the given tags to the given file-
+    """
+    with open(filepath, 'w') as f:
+        f.write(msg)
+        for (tag, value) in tags.items():
+            if value:
+                f.write('{}: {}\n'.format(tag, value))
+
+
+def parse_keyfile(key_path: str, private: bool = True) -> OrderedDict:
+    """
+    Internal helper. This parses a node.pub or node.priv file and
+    returns a dict mapping tags -> values.
+    """
+    if os.path.exists(key_path) and not os.path.isfile(key_path):
+        raise Exception("Key file '{}' exists, but isn't a file".format(key_path))
+
+    allowed_tags = [
+        # common tags
+        'public-key-ed25519',
+        'public-adr-eth',
+        'created-at',
+        'creator',
+
+        # user profile
+        'user-id',
+
+        # node profile
+        'machine-id',
+        'node-authid',
+        'node-cluster-ip',
+    ]
+
+    if private:
+        # private key file tags
+        allowed_tags.extend(['private-key-ed25519', 'private-key-eth'])
+
+    tags = OrderedDict()  # type: ignore
+    with open(key_path, 'r') as key_file:
+        got_blankline = False
+        for line in key_file.readlines():
+            if line.strip() == '':
+                got_blankline = True
+            elif got_blankline:
+                tag, value = line.split(':', 1)
+                tag = tag.strip().lower()
+                value = value.strip()
+                if tag not in allowed_tags:
+                    raise Exception("Invalid tag '{}' in key file {}".format(tag, key_path))
+                if tag in tags:
+                    raise Exception("Duplicate tag '{}' in key file {}".format(tag, key_path))
+                tags[tag] = value
+    return tags

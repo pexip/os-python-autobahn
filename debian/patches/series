@@ -1,2 +1,0 @@
-python3.7-fix.patch
-CVE-2020-35678_URL_must_be_re-encoded_when_doing_redirect.patch

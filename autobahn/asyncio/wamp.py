@@ -24,17 +24,8 @@
 #
 ###############################################################################
 
-from __future__ import absolute_import
+import asyncio
 import signal
-
-import six
-
-try:
-    import asyncio
-except ImportError:
-    # Trollius >= 0.3 was renamed to asyncio
-    # noinspection PyUnresolvedReferences
-    import trollius as asyncio
 
 import txaio
 txaio.use_asyncio()  # noqa
@@ -52,6 +43,8 @@ from autobahn.asyncio.rawsocket import WampRawSocketClientFactory
 from autobahn.websocket.compress import PerMessageDeflateOffer, \
     PerMessageDeflateResponse, PerMessageDeflateResponseAccept
 
+from autobahn.wamp.interfaces import ITransportHandler, ISession
+
 __all__ = (
     'ApplicationSession',
     'ApplicationSessionFactory',
@@ -66,11 +59,17 @@ class ApplicationSession(protocol.ApplicationSession):
 
     Implements:
 
-        * :class:`autobahn.wamp.interfaces.ITransportHandler`
-        * :class:`autobahn.wamp.interfaces.ISession`
+        * ``autobahn.wamp.interfaces.ITransportHandler``
+        * ``autobahn.wamp.interfaces.ISession``
     """
 
     log = txaio.make_logger()
+
+
+ITransportHandler.register(ApplicationSession)
+
+# ISession.register collides with the abc.ABCMeta.register method
+ISession.abc_register(ApplicationSession)
 
 
 class ApplicationSessionFactory(protocol.ApplicationSessionFactory):
@@ -78,7 +77,7 @@ class ApplicationSessionFactory(protocol.ApplicationSessionFactory):
     WAMP application session factory for asyncio-based applications.
     """
 
-    session = ApplicationSession
+    session: ApplicationSession = ApplicationSession
     """
     The application session class this application session factory will use.
     Defaults to :class:`autobahn.asyncio.wamp.ApplicationSession`.
@@ -134,8 +133,8 @@ class ApplicationRunner(object):
         :param headers: Additional headers to send (only applies to WAMP-over-WebSocket).
         :type headers: dict
         """
-        assert(type(url) == six.text_type)
-        assert(realm is None or type(realm) == six.text_type)
+        assert(type(url) == str)
+        assert(realm is None or type(realm) == str)
         assert(extra is None or type(extra) == dict)
         assert(headers is None or type(headers) == dict)
         assert(proxy is None or type(proxy) == dict)
@@ -190,7 +189,7 @@ class ApplicationRunner(object):
         else:
             create = make
 
-        if self.url.startswith(u'rs'):
+        if self.url.startswith('rs'):
             # try to parse RawSocket URL ..
             isSecure, host, port = parse_rs_url(self.url)
 
@@ -229,7 +228,7 @@ class ApplicationRunner(object):
                                                  tcpNoDelay=True,
                                                  autoPingInterval=10.,
                                                  autoPingTimeout=5.,
-                                                 autoPingSize=4,
+                                                 autoPingSize=12,
                                                  perMessageCompressionOffers=offers,
                                                  perMessageCompressionAccept=accept)
         # SSL context for client connection
@@ -248,7 +247,13 @@ class ApplicationRunner(object):
         if loop.is_closed() and start_loop:
             asyncio.set_event_loop(asyncio.new_event_loop())
             loop = asyncio.get_event_loop()
-        txaio.use_asyncio()
+            if hasattr(transport_factory, 'loop'):
+                transport_factory.loop = loop
+
+        # assure we are using asyncio
+        # txaio.use_asyncio()
+        assert txaio._explicit_framework == 'asyncio'
+
         txaio.config.loop = loop
         coro = loop.create_connection(transport_factory, host, port, ssl=ssl)
 
@@ -283,9 +288,13 @@ class ApplicationRunner(object):
             loop.close()
 
 
+# new API
 class Session(protocol._SessionShim):
     # XXX these methods are redundant, but put here for possibly
     # better clarity; maybe a bad idea.
+
+    def on_welcome(self, welcome_msg):
+        pass
 
     def on_join(self, details):
         pass
