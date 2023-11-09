@@ -37,7 +37,7 @@ Standards-Version: 4.1.1
 Vcs-Browser: https://salsa.debian.org/openstack-team/python/python-autobahn
 Vcs-Git: https://salsa.debian.org/openstack-team/python/python-autobahn.git
 Homepage: http://autobahn.ws/python
-XS-Pexip-Upstream: http://deb.debian.org/debian/ bullseye
+XS-Pexip-Upstream: http://deb.debian.org/debian/ bookworm
 
 Package: python3-autobahn
 Architecture: all
