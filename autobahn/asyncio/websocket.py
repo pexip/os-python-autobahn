@@ -24,32 +24,19 @@
 #
 ###############################################################################
 
-from __future__ import absolute_import
-
+import asyncio
+from asyncio import iscoroutine
+from asyncio import Future
 from collections import deque
+from typing import Optional
 
 import txaio
-txaio.use_asyncio()
+txaio.use_asyncio()  # noqa
 
-from autobahn.util import public
+from autobahn.util import public, hltype
+from autobahn.asyncio.util import create_transport_details, transport_channel_id
 from autobahn.wamp import websocket
 from autobahn.websocket import protocol
-
-try:
-    import asyncio
-    from asyncio import iscoroutine
-    from asyncio import Future
-except ImportError:
-    # Trollius >= 0.3 was renamed
-    # noinspection PyUnresolvedReferences
-    import trollius as asyncio
-    from trollius import iscoroutine
-    from trollius import Future
-
-if hasattr(asyncio, 'ensure_future'):
-    ensure_future = asyncio.ensure_future
-else:  # Deprecated since Python 3.4.4
-    ensure_future = asyncio.async
 
 __all__ = (
     'WebSocketServerProtocol',
@@ -76,23 +63,27 @@ class WebSocketAdapterProtocol(asyncio.Protocol):
     """
     Adapter class for asyncio-based WebSocket client and server protocols.
     """
+    log = txaio.make_logger()
+
+    peer: Optional[str] = None
+    is_server: Optional[bool] = None
 
     def connection_made(self, transport):
+        # asyncio networking framework entry point, called by asyncio
+        # when the connection is established (either a client or a server)
+        self.log.debug('{func}(transport={transport})', func=hltype(self.connection_made),
+                       transport=transport)
+
         self.transport = transport
+
+        # determine preliminary transport details (what is know at this point)
+        self._transport_details = create_transport_details(self.transport, self.is_server)
+
+        # backward compatibility
+        self.peer = self._transport_details.peer
 
         self.receive_queue = deque()
         self._consume()
-
-        try:
-            peer = transport.get_extra_info('peername')
-            try:
-                # FIXME: tcp4 vs tcp6
-                self.peer = u"tcp:%s:%d" % (peer[0], peer[1])
-            except:
-                # e.g. Unix Domain sockets don't have host/port
-                self.peer = u"unix:{0}".format(peer)
-        except:
-            self.peer = u"?"
 
         self._connectionMade()
 
@@ -108,7 +99,7 @@ class WebSocketAdapterProtocol(asyncio.Protocol):
         self.waiter = Future(loop=self.factory.loop or txaio.config.loop)
 
         def process(_):
-            while len(self.receive_queue):
+            while self.receive_queue:
                 data = self.receive_queue.popleft()
                 if self.transport:
                     self._dataReceived(data)
@@ -121,74 +112,85 @@ class WebSocketAdapterProtocol(asyncio.Protocol):
         if not self.waiter.done():
             self.waiter.set_result(None)
 
-    # noinspection PyUnusedLocal
     def _closeConnection(self, abort=False):
-        self.transport.close()
+        if abort and hasattr(self.transport, 'abort'):
+            self.transport.abort()
+        else:
+            self.transport.close()
 
     def _onOpen(self):
+        if self._transport_details.is_secure:
+            # now that the TLS opening handshake is complete, the actual TLS channel ID
+            # will be available. make sure to set it!
+            channel_id = {
+                'tls-unique': transport_channel_id(self.transport, self._transport_details.is_server, 'tls-unique'),
+            }
+            self._transport_details.channel_id = channel_id
+
         res = self.onOpen()
         if yields(res):
-            ensure_future(res)
+            asyncio.ensure_future(res)
 
     def _onMessageBegin(self, isBinary):
         res = self.onMessageBegin(isBinary)
         if yields(res):
-            ensure_future(res)
+            asyncio.ensure_future(res)
 
     def _onMessageFrameBegin(self, length):
         res = self.onMessageFrameBegin(length)
         if yields(res):
-            ensure_future(res)
+            asyncio.ensure_future(res)
 
     def _onMessageFrameData(self, payload):
         res = self.onMessageFrameData(payload)
         if yields(res):
-            ensure_future(res)
+            asyncio.ensure_future(res)
 
     def _onMessageFrameEnd(self):
         res = self.onMessageFrameEnd()
         if yields(res):
-            ensure_future(res)
+            asyncio.ensure_future(res)
 
     def _onMessageFrame(self, payload):
         res = self.onMessageFrame(payload)
         if yields(res):
-            ensure_future(res)
+            asyncio.ensure_future(res)
 
     def _onMessageEnd(self):
         res = self.onMessageEnd()
         if yields(res):
-            ensure_future(res)
+            asyncio.ensure_future(res)
 
     def _onMessage(self, payload, isBinary):
         res = self.onMessage(payload, isBinary)
         if yields(res):
-            ensure_future(res)
+            asyncio.ensure_future(res)
 
     def _onPing(self, payload):
         res = self.onPing(payload)
         if yields(res):
-            ensure_future(res)
+            asyncio.ensure_future(res)
 
     def _onPong(self, payload):
         res = self.onPong(payload)
         if yields(res):
-            ensure_future(res)
+            asyncio.ensure_future(res)
 
     def _onClose(self, wasClean, code, reason):
         res = self.onClose(wasClean, code, reason)
         if yields(res):
-            ensure_future(res)
-
-    def get_channel_id(self):
-        """
-        Implements :func:`autobahn.wamp.interfaces.ITransport.get_channel_id`
-        """
-        self.log.debug('FIXME: transport channel binding not implemented for asyncio (autobahn-python issue #729)')
-        return None
+            asyncio.ensure_future(res)
 
     def registerProducer(self, producer, streaming):
         raise Exception("not implemented")
+
+    def unregisterProducer(self):
+        # note that generic websocket/protocol.py code calls
+        # .unregisterProducer whenever we dropConnection -- that's
+        # correct behavior on Twisted so either we'd have to
+        # try/except there, or special-case Twisted, ..or just make
+        # this "not an error"
+        pass
 
 
 @public
@@ -218,8 +220,9 @@ class WebSocketClientProtocol(WebSocketAdapterProtocol, protocol.WebSocketClient
 
     def _onConnect(self, response):
         res = self.onConnect(response)
+        self.log.debug('{func}: {res}', func=hltype(self._onConnect), res=res)
         if yields(res):
-            ensure_future(res)
+            asyncio.ensure_future(res)
 
     def startTLS(self):
         raise Exception("WSS over explicit proxies not implemented")
@@ -247,6 +250,8 @@ class WebSocketServerFactory(WebSocketAdapterFactory, protocol.WebSocketServerFa
     * :class:`autobahn.websocket.interfaces.IWebSocketServerChannelFactory`
     """
 
+    log = txaio.make_logger()
+
     protocol = WebSocketServerProtocol
 
     def __init__(self, *args, **kwargs):
@@ -273,6 +278,8 @@ class WebSocketClientFactory(WebSocketAdapterFactory, protocol.WebSocketClientFa
     * :class:`autobahn.websocket.interfaces.IWebSocketClientChannelFactory`
     """
 
+    log = txaio.make_logger()
+
     def __init__(self, *args, **kwargs):
         """
 
@@ -298,12 +305,16 @@ class WampWebSocketServerProtocol(websocket.WampWebSocketServerProtocol, WebSock
     * :class:`autobahn.wamp.interfaces.ITransport`
     """
 
+    log = txaio.make_logger()
+
 
 @public
 class WampWebSocketServerFactory(websocket.WampWebSocketServerFactory, WebSocketServerFactory):
     """
     asyncio-based WAMP-over-WebSocket server factory.
     """
+
+    log = txaio.make_logger()
 
     protocol = WampWebSocketServerProtocol
 
@@ -340,12 +351,16 @@ class WampWebSocketClientProtocol(websocket.WampWebSocketClientProtocol, WebSock
     * :class:`autobahn.wamp.interfaces.ITransport`
     """
 
+    log = txaio.make_logger()
+
 
 @public
 class WampWebSocketClientFactory(websocket.WampWebSocketClientFactory, WebSocketClientFactory):
     """
     asyncio-based WAMP-over-WebSocket client factory.
     """
+
+    log = txaio.make_logger()
 
     protocol = WampWebSocketClientProtocol
 

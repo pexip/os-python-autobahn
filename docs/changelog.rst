@@ -5,8 +5,537 @@
 Changelog
 =========
 
-master (unreleased)
--------------------
+22.7.1
+------
+
+* fix: Fix a few typos in docs (#1587)
+* fix: remove log noise from autobahn.websocket.protocol (#1588)
+* new: add more helpers to EthereumKey and CryptosignKey (#1583)
+* new: EIP712 certificate chains, incl. use for WAMP-Cryptosign
+* fix: improve message logging at trace log level
+* fix: forward correct TLS channel ID once the TLS handshake is complete
+* new: add eip712 types for WAMP-Cryptosign certificates
+* new: add more helpers to EthereumKey and CryptosignKey
+* new: add EthereumKey.from_keyfile, CryptosignKey.from_keyfile, CryptosignKey.from_pubkey
+
+22.6.1
+------
+
+* new: add SecurityModuleMemory.from_config and SecurityModuleMemory.from_keyfile
+* new: moved UserKey from crossbar to autobahn
+* fix: more WAMP-Cryptosign unit tests
+* new: experimental WAMP API catalog support
+* new: regenerate FlatBuffers WAMP messages
+* fix: allow tests to pass without XBR dependencies (#1580)
+* new: Flatbuffers IDL based WAMP payload validation (#1576)
+* fix: restore autobahn.twisted.testing to distribution (#1578)
+
+22.5.1
+------
+
+* new: WAMP Flatbuffers IDL and schema processing (experimental)
+* new: WAMP-cryptosign trustroot (experimental)
+* new: add wrapper type for CryptosignAuthextra
+* fix: stricted type checking of Challenge; fix cryposign unit test;
+* new: more test coverage
+* fix: reduce log noise
+* fix: forward channel_binding selected in Component client
+* new: expand ISigningKey to provide security_module/key_id (if used)
+* fix: Component cryptosign test
+* fix: add type hints; fix channel_binding
+* new: work on federated realms and secmods
+* new: rename to and work on a.w.CryptosignKey
+* new: add bip44 for cryptosign test
+* fix: remove all txaio.make_logger refs from generic code (#1564)
+* new: initial support for federated WAMP realms via a.x.FederatedRealm/Seeder
+* new: moved utility functions and unit tests for WAMP realm name checking from Crossbar.io
+* new: allow list of URLs for transports in a.t.component.Component
+* new: add websocket_options to a.t.wamp.ApplicationRunner
+* new: add stop_at_close flag in a.t.component.run
+* fix: reduce log noise (regression) on ApplicationRunner Twisted (#1561)
+* new: allow ``max_retry_delay==0`` for always-immediate auto-reconnect in ApplicationRunner on Twisted
+* new: add ``websocket_options`` to WAMP ApplicationRunner on Twisted (#888)
+* new: more type hints and docs
+
+22.4.2
+------
+
+* fix: can not import autobahn.twisted.util with no-TLS (#1559)
+
+22.4.1
+------
+
+* new: modernize SessionDetails
+* new: improve ISession/ITransportHandler and implementations (#1557)
+* new: expand and refactor TransportDetails (#1551)
+* fix: misc fixes, add type hints, more docs (#1547)
+* new: key modules for use with WAMP-cryptosign (#1544)
+* fix: string formatting with binary values in TransportDetails.secure_channel_id (#1483)
+* fix: never default set authid/authrole in component authenticators
+* fix: TransportDetails string formatting (fixes #1486)
+* fix: reading private ssh key for cryptosign (fixes #932)
+* fix: do not throw (but log) when leaving a session not joined (#1542)
+* fix: store WAMP authextra received (#1541)
+
+22.3.2
+------
+
+* fix: split out UI deps into separate dist flavor (#1532)
+* fix: deps for RTD builds (#1540)
+* fix: use and bundle dev deps from requirements file
+
+22.3.1
+------
+
+* fix: reduce twisted log noise for wamp clients (#1537)
+* fix: roundrobin in WAMP component (#1533)
+* fix: generate_token (#1531)
+* fix: add GitHub URL for PyPi (#1528)
+
+22.2.2
+------
+
+* fix: auto ping/pong logs should be debug instead of info (#1524)
+
+22.2.1
+------
+
+* new: add auto-ping/pong configuration knob ``autoPingRestartOnAnyTraffic`` (see discussion `here <https://github.com/crossbario/autobahn-python/issues/1327>`_).
+* new: extended websocket auto-ping/pong ("heartbeating") with builtin RTT measurement
+* new: experimental support for ``transaction_hash`` in WAMP Publish/Call (see discussion `here <https://github.com/wamp-proto/wamp-proto/issues/391#issuecomment-998577967>`_).
+* new: support decimal numbers WAMP serialization and round-tripping in both JSON and CBOR
+* fix: only depend on cbor2 (for WAMP CBOR serialization), not also cbor
+* fix: PyInstaller and Docker build / CI issues
+
+22.1.1
+------
+
+* new: support Python 3.10
+* new: allow optional keys in endpoint config validation
+* fix: reset transport retry status when connection succeeds
+* fix: update Docker/PyPy to pypy:3.8-slim
+
+21.11.1
+-------
+
+* fix: autobahn installation in docker (#1503)
+* new: refactor SigningKey class for reusability (#1500, #1501)
+* new: expand XBR node pairing helpers
+* fix: build with nvx by default and don't publish universal wheel. (#1493)
+* fix: update wamp flatbuffer schema for r2r links
+* fix: don't clobber factory (#1480)
+* fix: explicitly require setuptools
+* new: expand wamp auth scram and xbr argon2/hkdf (#1479)
+* fix: WebSocket compression, window size (zlib wbits) == 8 is illegal nowerdays (#1477)
+* fix: XBR IDL code generator - all 4 WAMP actions working now
+* new: add automated build of xbrnetwork CLI (single-file EXE) in CI
+
+21.3.1
+------
+
+* fix: Twisted v21.2.0 breaks Crossbar.io (see https://github.com/crossbario/crossbar/issues/1864)
+
+21.2.2
+------
+
+* new: use_binary_hex_encoding option for JSON object serializer
+* fix: correct some sphinx doc references
+* new: minimum supported Python (language) version is now 3.7 (on CPython and PyPy)
+* new: more XBR proxy/stub code generation capabilities (RPC call/invoation handlers)
+* fix: wamp-cryptosign loading of keys from SSH agent
+* fix: update Docker image building and build Docker multi-arch images
+* new: add more WAMP-cryptosign signature test vectors and unit tests
+* fix: include XBR code rendering templates in package manifest
+
+21.2.1
+------
+
+* new: XBR ABI files now via separate package ("xbr") - substantially reduce package size for non-XBR users
+* fix: circular dependency in "xbr" install flavor (prohibited pip install from github master)
+* fix: XBR package manifest and CLI user profile loading
+
+21.1.1
+------
+
+* fix: consider 'wamp.close.goodbye_and_out' a clean exit (#1450)
+* fix: HASH import as well as improve diagnostics if things go wrong (#1451)
+* fix: add missing jinja2 dependency for XBR CLI (#1447)
+* fix: ``wamp.close.goodbye_and_out`` counts as a clean exit (#1370)
+
+20.12.3
+-------
+
+* fix: URL must be re-encoded when doing redirect (#1439)
+* fix: update and migrate CI/CD pipeline to GitHub Actions
+* new: minimum supported Python (language) version is now 3.6 (on CPython and PyPy)
+
+20.12.2
+-------
+
+* fix: derive_bip32childkey traceback (#1436)
+* fix: update and adjust docker files to upstream changes
+
+20.12.1
+-------
+
+* new: CLI commands for WAMP IDL (`xbrnetwork describe-schema / codegen-schema`)
+* new: add eth address helpers (#1413)
+* new: cryptosign authextra allow arbitrary keys (#1411)
+* fix: adapt to planet api prefix change (#1408)
+* fix: Type check improve (#1405)
+
+20.7.1
+------
+
+* new: add market login eip. expose helpers (#1402)
+
+20.6.2
+------
+
+* fix: xbr fixes (#1396)
+* fix: use cpy 3.8 for running flake in CI
+* new: Ticket1392 internal attrs (#1394)
+* new: internal-only router attributes and hook for router to add custom information
+
+20.6.1
+------
+
+* new: massive expansion of XBR CLI and EIP712 helpers
+* new: more (exhaustive) serializer cross-tripping tests
+* fix: some code quality and bug-risk issues (#1379)
+* fix: removed externalPort assignment when not set (#1378)
+* fix: docs link in README (#1381)
+* fix: docs typo frameword -> framework (#1380)
+* fix: improve logging; track results on observable mixin
+* new: add environmental variable that strips xbr. (#1374)
+* fix: trollius is gone (#1373)
+* new: added ability to disable TLS channel binding (#1368)
+
+20.4.3
+------
+
+* new: XBR CLI (#1367)
+* fix: add missing XBR dependency `py-multihash`
+
+20.4.2
+------
+
+* new: XBR - package XBR v20.4.2 ABI files
+* new: XBR - adjust eip712 signature for channel close
+* new: XBR - adjustments after xbr refactoring (#1357)
+* new: XBR - add channel open/close eip712 types to AB (#1358)
+* new: WAMP-cryptosign - make channel_id_type optional in transport_channel_id()
+
+20.4.1
+------
+
+* new: XBR ABI files are downloaded from upstream and extracted into package (fixes #1349)
+* new: expose new XBR top-level contracts
+* fix: bump dependencies versions for attrs and identity (#1346)
+* fix: FrontendProxyProtocol object has no attribute 'write' (#1339)
+* fix: WAMP-cryptosign authid is not mandatory; reduce log noise (#1340)
+
+20.3.1
+------
+
+* fix: confusion between paying and payment channel (#1337)
+* new: forward explicitly set app level errors from ApplicationRunner.run() (#1336)
+* fix: simple typo: hookinh -> hooking (#1333)
+* new: update for xbr v20.3.1
+* fix: for #1327 - cancel Auto Ping Timeout  (#1328)
+* new: helper function to create a configured Web3 blockchain connection (#1329)
+
+20.2.2
+------
+
+* new: update XBR ABI files to XBR release v20.2.2
+
+20.2.1
+------
+
+* new: update XBR ABI files to XBR release v20.2.1
+* fix: add AuthAnonymous to __all__ (#1303)
+
+20.1.3
+------
+
+* fix: CI building (caching?) issue "corrupt ZIP file"
+* fix: update docker image build scripts and add ARM64/PyPy
+* fix: update XBR ABI files
+* fix: use txaio.time_ns and drop deprecated autobahn.util.time_ns
+* fix: update project README and docs for supported python versions (#1296)
+* fix: WebSocket protocol instances now raise `autobahn.exception.Disconnected` when sending on a closed connection (#1002)
+* fix: version conflict in xbr downstream application dependency (crossbarfx) (#1295)
+
+20.1.2
+------
+
+* fix: add `python_requires>=3.5` to prevent installation on python 2 (#1293)
+
+20.1.1
+------
+
+* IMPORTANT: beginning release v20.1.1, Autobahn|Python only supports Python 3.5 or later.
+* fix: first part of cleaning up code, dropping Python 2 support (#1282).
+
+19.11.2
+-------
+
+* IMPORTANT: release v19.11.2 will be the last release supporting Python 2. We will support Python 3.5 and later beginning with Autobahn v20.1.1.
+* fix: add docs for parameters to component.py (#1276)
+* new: statistics tracking on WAMP serializers :class:`autobahn.wamp.serializer.Serializer`
+* new: helper autobahn.util.time_ns
+
+19.11.1
+-------
+
+* fix: argument type check for fragmentSize in sendMessage
+* new: start_loop option for WAMP components
+* new: ethereum bip39/32 helpers
+* new: enable XBR in Docker image build scripts
+
+19.10.1
+-------
+
+* new: updated docker image scripts
+* new: add WAMP serializer in use to SessionDetails
+* fix: partial support for xb buyers/sellers in pypy
+* fix: remove dependency on "ethereum" package (part of pypy support)
+
+19.9.3
+------
+
+* new: XBR - update XBR for new contract ABIs
+* new: XBR - payment channel close
+* new: XBR - implement EIP712 signing of messages in endpoints
+
+19.9.2
+------
+
+* new: XBR - update XBR for new contract ABIs
+
+19.9.1
+------
+
+* new: XBR - update XBR for new contract ABIs
+
+19.8.1
+------
+
+* new: implement XBR off-chain delegate transaction signing and verification (#1202)
+* new: update XBR for new contract ABIs
+
+19.7.2
+------
+
+* fix: monkey patch re-add removed helper functions removed in eth-abi
+* new: simple blockchain (XBR) client
+* new: update XBR ABI files
+* new: XBR endpoint transaction signing
+* new: client side catching of WAMP URI errors in `session.call|register|publish|subscribe`
+
+19.7.1
+------
+
+* fix: implement client side payload exceed max size; improve max size exceeded handling
+* fix: detect when our transport is "already" closed at connect time (#1215)
+* fix: XBR examples
+
+19.6.2
+------
+
+* fix: add forgotten cryptography dependency (#1205)
+
+19.6.1
+------
+
+* new: XBR client library integrated (#1201)
+* new: add entropy depletion unit tests
+* fix: make CLI tool python2 compatible (#1197)
+* fix: use cryptography pbkdf2 instead of custom (#1198)
+* fix: include tests for packaging (#1194)
+
+19.5.1
+------
+
+* fix: authextra merging (#1191)
+* fix: set default retry_delay_jitter (#1190)
+* new: add rawsocket + twisted example (#1189)
+* new: WebSocket testing support, via Agent-style interface (#1186)
+* new: decorator for on_connectfailure
+* fix: delayed call leakage (#1152)
+* new: CLI client (#1150)
+* fix: set up TLS over proxy properly (#1149)
+* new: expose ser modules (#1148)
+* fix: base64 encodings, add hex encoding (#1146)
+* new: onConnecting callback (with TransportDetails and
+  ConnectingRequest). **Note**: if you've implemented a pure
+  `IWebSocketChannel` without inheriting from Autobahn base classes,
+  you'll need to add an `onConnecting()` method that just does `return
+  None`.
+
+19.3.3
+------
+
+* fix: RegisterOptions should have details|bool parameter (#1143)
+* new: WAMP callee disclosure
+* new: WAMP forward_for in more message types; expose forward_for in options/details types
+* new: expose underlying serializer modules on WAMP object serializers
+* fix: WAMP-cryptosign fix base64 encodings, add hex encoding (#1146)
+
+19.3.2
+------
+
+* fix: import guards for flatbuffers (missed in CI as we run with "all deps installed" there)
+
+19.3.1
+------
+
+* new: add experimental support for WAMP-FlatBuffers serializer: EVENT and PUBLISH messages for now only
+* new: add FlatBuffers schema for WAMP messages
+* fix: improve serializer package preference behavior depending on CPy vs PyPy
+* fix: relax protocol violations: ignore unknown INTERRUPT and GOODBYE already sent; reduce log noise
+* fix: skipping Yield message if transport gets closed before success callback is called (#1119)
+* fix: integer division in logging in py3 (#1120)
+* fix: Await tasks after they've been cancelled in `autobahn.asycio.component.nicely_exit` (#1116)
+
+19.2.1
+------
+
+* fix: set announced roles on appsession object (#1109)
+* new: lower log noise on ApplicationErrors (#1107)
+* new: allow explicit passing of tx endpoint and reactor (#1103)
+* new: add attribute to forward applicationrunner to applicationsession via componentconfig
+
+19.1.1
+------
+
+* new: adding marshal on SessionDetails
+
+18.12.1
+-------
+
+* fix: return the wrapped function from component decorators (#1093)
+* new: add proxy= support for Component transports (#1091)
+* fix: Ticket1077 stop start (#1090)
+* fix: cleanup cancel handling (#1087)
+
+18.11.2
+-------
+
+* fix: asyncio unregisterProducer raises exception (#1079)
+* fix: URL is not required in RawSocket configuration items with WAMP component API
+* fix: revert PR https://github.com/crossbario/autobahn-python/pull/1075
+
+18.11.1
+-------
+
+* new: forward_for WAMP message attribute (for Crossbar.io Router-to-Router federation)
+* new: support RawSocket URLs (eg "rs://localhost:5000" or "rs://unix:/tmp/file.sock")
+* new: support WAMP-over-Unix sockets for WAMP components ("new API")
+* fix: use same WAMP serializer construction code for WAMP components ("new API") and ApplicationSession/Runner
+* fix: memory leak with Twisted/WebSocket, dropConnection and producer
+
+18.10.1
+-------
+
+* Don't eat Component.stop() request when crossbar not connected (#1066)
+* handle async on_progress callbacks properly (#1061)
+* fix attribute error when ConnectionResetError does not contain "reason" attribute (#1059)
+* infer rawsocket host, port from URL (#1056)
+* fix error on connection lost if no reason (reason = None) (#1055)
+* fixed typo on class name (#1054)
+
+18.9.2
+------
+
+* fix: TLS error logging (#1052)
+
+
+18.9.1
+------
+
+* new: Interrupt has Options.reason to signal detailed origin of call cancelation (active cancel vs passive timeout)
+* fix: Cancel and Interrupt gets ``"killnowait"`` mode
+* new: Cancel and Interrupt no longer have ``ABORT/"abort"``
+
+
+18.8.2
+------
+
+* new: WAMP call cancel support
+* fix: getting started documentation and general docs improvements
+* fix: WebSocket auto-reconnect on opening handshake failure
+* fix: more Python 3.7 compatibility and CI
+* fix: Docker image building using multi-arch, size optimizations and more
+* fix: asyncio failed to re-connect under some circumstances (#1040,
+  #1041, #1010, #1030)
+
+
+18.8.1
+------
+
+* fix: Python 3.7 compatibility
+* fix: remove Python 2.6 support leftovers
+* new: getting started docker-based examples in matching with docs
+
+
+18.7.1
+------
+
+* new: Python 3.7 supported and integrated into CI
+* new: WAMP-SCRAM examples
+* fix: glitches in WAMP-SCRAM
+
+
+18.6.1
+------
+
+* fix: implement abort argument for asyncio in WebSocketAdapterProtocol._closeConnection (#1012)
+
+
+18.5.2
+------
+
+* fix: security (DoS amplification): a WebSocket server with
+  permessage-deflate turned on could be induced to waste extra memory
+  through a "zip-bomb" style attack. Setting a max-message-size will
+  now stop deflating compressed data when the max is reached (instead
+  of consuming all compressed data first). This could be used by a
+  malicious client to make the server waste much more memory than the
+  bandwidth the client uses.
+
+
+18.5.1
+------
+
+* fix: asyncio/rawsocket buffer processing
+* fix: example failures due to pypy longer startup time (#996)
+* fix: add on_welcome for AuthWampCra (#992)
+* fix: make run() of multiple components work on Windows (#986)
+* new: `max_retries` now defaults to -1 ("try forever")
+
+
+18.4.1
+------
+
+* new: WAMP-SCRAM authentication
+* new: native vector extensions (NVX)
+* fix: improve choosereactor (#965, #963)
+* new: lots of new and improved documentation, component API and more
+* new: Docker image tooling now in this repo
+* fix: "fatal errors" in Component (#977)
+* fix: AIO/Component: create a new loop if already closed
+* fix: kwarg keys sometimes are bytes on Python2 (#980)
+* fix: various improvements to new component API
+
+
+18.3.1
+------
+
+* fix: endpoint configuration error messages (#942)
+* fix: various improvements to the new components API (including retries)
+* fix: pass `unregisterProducer` through to twisted to complement `WebSocketAdapterProtocol.registerProducer` (#875)
 
 
 17.10.1

@@ -14,6 +14,9 @@ WAMP Types
 .. automodule:: autobahn.wamp.types
     :members:
 
+.. automodule:: autobahn.wamp.request
+    :members:
+
 
 WAMP Exceptions
 ---------------
@@ -33,4 +36,21 @@ WAMP Authentication and Encryption
     :members:
 
 .. automodule:: autobahn.wamp.cryptobox
+    :members:
+
+
+WAMP Serializer
+---------------
+
+.. automodule:: autobahn.wamp.serializer
+    :members:
+
+
+WAMP Messages
+-------------
+
+.. automodule:: autobahn.wamp.message
+    :members:
+
+.. automodule:: autobahn.wamp.message_fbs
     :members:

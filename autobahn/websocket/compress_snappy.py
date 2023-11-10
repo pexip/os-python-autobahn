@@ -24,8 +24,6 @@
 #
 ###############################################################################
 
-from __future__ import absolute_import
-
 import snappy
 
 from autobahn.websocket.compress_base import PerMessageCompressOffer, \
@@ -412,7 +410,7 @@ class PerMessageSnappy(PerMessageCompress, PerMessageSnappyMixin):
         return self._compressor.add_chunk(data)
 
     def end_compress_message(self):
-        return ""
+        return b""
 
     def start_decompress_message(self):
         if self._is_server:

@@ -25,9 +25,7 @@
 ###############################################################################
 
 
-from __future__ import absolute_import, print_function
-
-from autobahn.wamp.cryptosign import HAS_CRYPTOSIGN, SigningKey
+from autobahn.wamp.cryptosign import HAS_CRYPTOSIGN, CryptosignKey
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 
@@ -47,7 +45,7 @@ if HAS_CRYPTOSIGN:
         HAS_CRYPTOSIGN_SSHAGENT = False
     else:
         HAS_CRYPTOSIGN_SSHAGENT = True
-        __all__.append('SSHAgentSigningKey')
+        __all__.append('SSHAgentCryptosignKey')
 
 
 if HAS_CRYPTOSIGN_SSHAGENT:
@@ -56,7 +54,7 @@ if HAS_CRYPTOSIGN_SSHAGENT:
     from nacl import signing
     from autobahn.wamp.cryptosign import _read_ssh_ed25519_pubkey, _unpack, _pack
 
-    class SSHAgentSigningKey(SigningKey):
+    class SSHAgentCryptosignKey(CryptosignKey):
         """
         A WAMP-cryptosign signing key that is a proxy to a private Ed25510 key
         actually held in SSH agent.
@@ -67,7 +65,7 @@ if HAS_CRYPTOSIGN_SSHAGENT:
         """
 
         def __init__(self, key, comment=None, reactor=None):
-            SigningKey.__init__(self, key, comment)
+            CryptosignKey.__init__(self, key, comment)
             if not reactor:
                 from twisted.internet import reactor
             self._reactor = reactor
@@ -108,8 +106,8 @@ if HAS_CRYPTOSIGN_SSHAGENT:
 
                 for blob, comment in keys:
                     raw = _unpack(blob)
-                    algo = raw[0]
-                    if algo == u'ssh-ed25519':
+                    algo = raw[0].decode('utf8')
+                    if algo == 'ssh-ed25519':
                         algo, _pubkey = raw
                         if _pubkey == pubkey:
                             key_data = _pubkey
@@ -141,7 +139,7 @@ if HAS_CRYPTOSIGN_SSHAGENT:
                 # we are now connected to the locally running ssh-agent
                 # that agent might be the openssh-agent, or eg on Ubuntu 14.04 by
                 # default the gnome-keyring / ssh-askpass-gnome application
-                blob = _pack(['ssh-ed25519', self.public_key(binary=True)])
+                blob = _pack(['ssh-ed25519'.encode(), self.public_key(binary=True)])
 
                 # now ask the agent
                 signature_blob = yield agent.signData(blob, challenge)

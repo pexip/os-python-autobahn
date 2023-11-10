@@ -24,21 +24,19 @@
 #
 ###############################################################################
 
-from __future__ import absolute_import
-
+from pprint import pformat
 from autobahn.util import public
-
-import json
-import six
 
 __all__ = (
     'ConnectionRequest',
+    'ConnectingRequest',
     'ConnectionResponse',
     'ConnectionAccept',
     'ConnectionDeny',
     'Message',
     'IncomingMessage',
     'OutgoingMessage',
+    'Ping',
 )
 
 
@@ -124,7 +122,71 @@ class ConnectionRequest(object):
                 'extensions': self.extensions}
 
     def __str__(self):
-        return json.dumps(self.__json__())
+        return pformat(self.__json__())
+
+
+@public
+class ConnectingRequest(object):
+    """
+    Thin-wrapper for WebSocket connection request information provided in
+    :meth:`autobahn.websocket.protocol.WebSocketClientProtocol.onConnecting`
+    after a client has connected, but before the handshake has
+    proceeded.
+
+    `host`, `port`, and `resource` are all required, everything else
+    is optional. Note that these are values that will be seen by the
+    client and should represent the public-facing host, port and
+    resource to which the client is connecting (not necessarily the
+    action host/port being used).
+    """
+
+    __slots__ = (
+        'host',
+        'port',
+        'resource',
+        'headers',
+        'useragent',
+        'origin',
+        'protocols',
+    )
+
+    def __init__(self, host=None, port=None, resource=None, headers=None, useragent=None, origin=None, protocols=None):
+        """
+        Any of the arguments can be `None`, which will provide a useful
+        default.
+
+        :param str host: the host to present to the server
+
+        :param int port: the port to present to the server
+
+        :param str resouce:
+
+        :param headers: extra HTTP headers to send in the opening handshake
+        :type headers: dict
+        """
+        # required
+        self.host = host if host is not None else "localhost"
+        self.port = port if port is not None else 80
+        self.resource = resource if resource is not None else "/"
+        # optional
+        self.headers = headers if headers is not None else dict()
+        self.useragent = useragent
+        self.origin = origin
+        self.protocols = protocols if protocols is not None else []
+
+    def __json__(self):
+        return {
+            'host': self.host,
+            'port': self.port,
+            'resource': self.resource,
+            'headers': self.headers,
+            'useragent': self.useragent,
+            'origin': self.origin,
+            'protocols': self.protocols,
+        }
+
+    def __str__(self):
+        return pformat(self.__json__())
 
 
 @public
@@ -176,7 +238,7 @@ class ConnectionResponse(object):
                 'extensions': self.extensions}
 
     def __str__(self):
-        return json.dumps(self.__json__())
+        return pformat(self.__json__())
 
 
 @public
@@ -204,15 +266,15 @@ class ConnectionAccept(object):
             tuple/list.
         :type headers: dict or None
         """
-        assert(subprotocol is None or type(subprotocol) == six.text_type)
+        assert(subprotocol is None or type(subprotocol) == str)
         assert(headers is None or type(headers) == dict)
         if headers is not None:
             for k, v in headers.items():
-                assert(type(k) == six.text_type)
-                assert(type(v) == six.text_type or type(v) == list or type(v) == tuple)
+                assert(type(k) == str)
+                assert(type(v) == str or type(v) == list or type(v) == tuple)
                 if type(v) == list or type(v) == tuple:
                     for vv in v:
-                        assert(type(vv) == six.text_type)
+                        assert(type(vv) == str)
 
         self.subprotocol = subprotocol
         self.headers = headers
@@ -277,7 +339,7 @@ class ConnectionDeny(Exception):
         :type reason: unicode
         """
         assert(type(code) == int)
-        assert(reason is None or type(reason) == six.text_type)
+        assert(reason is None or type(reason) == str)
 
         self.code = code
         self.reason = reason

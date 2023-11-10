@@ -33,6 +33,7 @@ except ImportError:
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('./_extensions'))
 sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('.'))
 
 # monkey-patch txaio so that we can "use" both twisted *and* asyncio,
 # at least at import time -- this is so the autodoc stuff can
@@ -92,15 +93,24 @@ def autodoc_skip_member(app, what, name, obj, skip, options):
     else:
         return True
 
-def setup(app):
-    # wire up our custom checker to skip member
-    app.connect('autodoc-skip-member', autodoc_skip_member)
+# !! when enabled, only members with "@public" decorator will be rendered in the docs !!
+# def setup(app):
+#     # wire up our custom checker to skip member
+#     app.connect('autodoc-skip-member', autodoc_skip_member)
 
 
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
 #needs_sphinx = '1.0'
+
+autoapi_type = 'python'
+autoapi_dirs = ['../autobahn']
+autoapi_add_toctree_entry = False
+autoapi_options = ['members', 'undoc-members', 'private-members', 'show-inheritance', 'special-members', 'show-module-summary']
+# autoapi_template_dir = 'docs/autoapi/templates'
+autoapi_python_use_implicit_namespaces = True
+
 
 # Check if we are building on readthedocs
 RTD_BUILD = os.environ.get('READTHEDOCS', None) == 'True'
@@ -109,15 +119,23 @@ RTD_BUILD = os.environ.get('READTHEDOCS', None) == 'True'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-   'sphinx.ext.autodoc',
-   'sphinx.ext.viewcode',
-   'sphinx.ext.intersphinx',
+    # https://sphinx-autoapi.readthedocs.io
+    'autoapi.extension',
 
-   'sphinx.ext.ifconfig',
-   'sphinx.ext.todo',
-   'sphinx.ext.doctest',
-   #'sphinxcontrib.spelling',
-   'txsphinx'
+    'sphinx.ext.autodoc',
+    'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.ifconfig',
+    'sphinx.ext.todo',
+    'sphinx.ext.doctest',
+
+    # Usage:            .. thumbnail:: picture.png
+    # Installation:     pip install sphinxcontrib-images
+    # Source:           https://github.com/sphinx-contrib/images
+    'sphinxcontrib.images',
+
+    #'sphinxcontrib.spelling',
+    'txsphinx'
 ]
 
 # extensions not available on RTD
@@ -141,15 +159,15 @@ source_suffix = '.rst'
 master_doc = 'contents'
 
 # General information about the project.
-project = u'autobahn'
-author = u'Crossbar.io Project'
-this_year = u'{0}'.format(time.strftime('%Y'))
-if this_year != u'2012':
-    copyright = u'2012-{0}, Crossbar.io Technologies GmbH'.format(this_year)
+project = 'autobahn'
+author = 'Crossbar.io Project'
+this_year = '{0}'.format(time.strftime('%Y'))
+if this_year != '2012':
+    copyright = '2012-{0}, Crossbar.io Technologies GmbH'.format(this_year)
 else:
-    copyright = u'2012, Crossbar.io Technologies GmbH'
+    copyright = '2012, Crossbar.io Technologies GmbH'
 
-# The version info for the project you're documenting, acts as replacement for
+# The version info for the project yo're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
@@ -301,9 +319,12 @@ htmlhelp_basename = 'autobahndoc'
 
 # http://sphinx-doc.org/ext/intersphinx.html
 intersphinx_mapping = {
-   'py2': ('https://docs.python.org/2', None),
    'py3': ('https://docs.python.org/3', None),
-   'six': ('https://pythonhosted.org/six/', None),
+   'python': ('https://docs.python.org/3', None),
+   'rtd': ('https://docs.readthedocs.io/en/latest/', None),
+   'txaio': ('https://txaio.readthedocs.io/en/latest/', None),
+   'autobahn': ('https://autobahn.readthedocs.io/en/latest/', None),
+   'zlmdb': ('https://zlmdb.readthedocs.io/en/latest/', None),
 }
 
 rst_epilog = """
@@ -334,4 +355,4 @@ rst_prolog = """
 autoclass_content = 'both'
 
 # http://www.sphinx-doc.org/en/stable/ext/autodoc.html#confval-autodoc_member_order
-autodoc_member_order = 'bysource'
+# autodoc_member_order = 'bysource'
