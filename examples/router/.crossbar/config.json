@@ -67,6 +67,12 @@
                                     "allow": {
                                         "register": true
                                     }
+                                },
+                                {
+                                    "uri": "com.example.scram_auth",
+                                    "allow": {
+                                        "register": true
+                                    }
                                 }
                             ]
                         },
@@ -116,7 +122,8 @@
                                 "close_handshake_timeout": 1000,
                                 "auto_ping_interval": 10000,
                                 "auto_ping_timeout": 5000,
-                                "auto_ping_size": 4,
+                                "auto_ping_size": 12,
+                                "auto_ping_restart_on_any_traffic": true,
                                 "compression": {
                                     "deflate": {
                                         "request_no_context_takeover": false,
@@ -150,6 +157,10 @@
                                             "keylen": 32
                                         }
                                     }
+                                },
+                                "scram": {
+                                    "type": "dynamic",
+                                    "authenticator": "com.example.scram_auth"
                                 },
                                 "anonymous": {
                                     "type": "static",
@@ -195,6 +206,13 @@
                             "key": "server.key",
                             "certificate": "server.crt"
                         }
+                    }
+                },
+                {
+                    "type": "websocket",
+                    "endpoint": {
+                        "type": "unix",
+                        "path": "unix_socket"
                     }
                 }
             ],

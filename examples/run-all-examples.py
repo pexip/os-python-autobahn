@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
-
 # this is mostly for testing that the examples run without errors
 #
 # To use this script:
@@ -16,6 +14,7 @@ from __future__ import print_function
 # frontend/backend pair for a few seconds.
 
 import sys
+import platform
 from os import environ
 from os.path import join, exists
 
@@ -104,7 +103,11 @@ def start_crossbar():
     reactor.spawnProcess(protocol, exe, args, path='.', env=env)
 
     yield launched
-    yield sleep(2)
+    if platform.python_implementation() == 'PyPy':
+        DELAY = 10.
+    else:
+        DELAY = 2.
+    yield sleep(DELAY)
     returnValue(protocol)
 
 

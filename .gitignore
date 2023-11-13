@@ -1,3 +1,4 @@
+.qemu
 *.mp4
 *.pyc
 *.pyo
@@ -38,3 +39,12 @@ node.key
 *.swp
 *.swo
 *.swn
+*.so
+coverage.xml
+.coverage.*
+autobahn/xbr/contracts
+.wheels
+get-pip.py
+docs/autoapi/
+key.pub
+key.priv

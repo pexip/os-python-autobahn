@@ -24,24 +24,14 @@
 #
 ###############################################################################
 
-from __future__ import absolute_import
-
 import os
 import sys
+import shutil
 import platform
 from setuptools import setup
 from setuptools.command.test import test as test_command
 
-# remember if we already had six _before_ installation
-try:
-    import six  # noqa
-    _HAD_SIX = True
-except ImportError:
-    _HAD_SIX = False
-
 CPY = platform.python_implementation() == 'CPython'
-PY3 = sys.version_info >= (3,)
-PY33 = (3, 3) <= sys.version_info < (3, 4)
 
 # read version string
 with open('autobahn/_version.py') as f:
@@ -52,102 +42,181 @@ with open('README.rst') as f:
     docstr = f.read()
 
 # Twisted dependencies (be careful bumping these minimal versions,
-# as we make claims to support older Twisted!)
+# as we make claim to support older Twisted!)
 extras_require_twisted = [
-    "zope.interface>=3.6.0",        # Zope Public License
-    "Twisted >= 12.1.0"             # MIT license
+    "zope.interface>=5.2.0",        # Zope Public License
+    "twisted>=20.3.0",              # MIT license (https://pypi.org/project/Twisted/20.3.0/)
+    "attrs>=20.3.0"                 # MIT license (https://pypi.org/project/attrs/19.2.0/)
 ]
-
-# asyncio dependencies
-if PY3:
-    if PY33:
-        # "Tulip"
-        extras_require_asyncio = [
-            "asyncio>=3.4.3"        # Apache 2.0
-        ]
-    else:
-        # Python 3.4+ has asyncio builtin
-        extras_require_asyncio = []
-else:
-    # backport of asyncio for Python 2
-    extras_require_asyncio = [
-        "trollius>=2.0",            # Apache 2.0
-        "futures>=3.0.4"            # BSD license
-    ]
 
 # C-based WebSocket acceleration (only use on CPython, not PyPy!)
 if CPY and sys.platform != 'win32':
     # wsaccel does not provide wheels: https://github.com/methane/wsaccel/issues/12
     extras_require_accelerate = [
-        "wsaccel>=0.6.2"            # Apache 2.0
+        # "wsaccel>=0.6.3"            # Apache 2.0
     ]
 else:
     extras_require_accelerate = []
 
 # non-standard WebSocket compression support (FIXME: consider removing altogether)
 # Ubuntu: sudo apt-get install libsnappy-dev
-# lz4: do we need that anyway?
 extras_require_compress = [
-    "python-snappy>=0.5",       # BSD license
-    "lz4>=0.7.0"                # BSD license
+    "python-snappy>=0.6.0",         # BSD license
 ]
 
-# non-JSON WAMP serialization support (namely MsgPack, CBOR and UBJSON)
-os.environ['PYUBJSON_NO_EXTENSION'] = '1'  # enforce use of pure Python py-ubjson (no Cython)
-extras_require_serialization = [
-    "u-msgpack-python>=2.1",    # MIT license
-    "cbor>=1.0.0",              # Apache 2.0 license
-    "py-ubjson>=0.8.4"          # Apache 2.0 license
-]
+# accelerated JSON and non-JSON WAMP serialization support (namely MessagePack, CBOR and UBJSON)
+extras_require_serialization = []
+if CPY:
+    extras_require_serialization.extend([
+        'msgpack>=1.0.2',           # Apache 2.0 license
+        'ujson>=4.0.2',             # BSD license
+    ])
+else:
+    os.environ['PYUBJSON_NO_EXTENSION'] = '1'  # enforce use of pure Python py-ubjson (no Cython)
+    extras_require_serialization.extend([
+        'u-msgpack-python>=2.1',    # MIT license
+    ])
+
+extras_require_serialization.extend([
+    'cbor2>=5.2.0',             # MIT license
+    'py-ubjson>=0.16.1',        # Apache 2.0 license
+    'flatbuffers>=1.12',        # Apache 2.0 license
+])
 
 # TLS transport encryption
 # WAMP-cryptosign end-to-end encryption
 # WAMP-cryptosign authentication
 os.environ['SODIUM_INSTALL'] = 'bundled'  # enforce use of bundled libsodium
 extras_require_encryption = [
-    'pyopenssl>=16.2.0',        # Apache 2.0 license
-    'service_identity>=16.0.0', # MIT license
-    'pynacl>=1.0.1',            # Apache license
-    'pytrie>=0.2',              # BSD license
-    'pyqrcode>=1.1'             # BSD license
+    'pyopenssl>=20.0.1',            # Apache 2.0 license
+    'service_identity>=18.1.0',     # MIT license
+    'pynacl>=1.4.0',                # Apache license
+    'pytrie>=0.4.0',                # BSD license
+    'qrcode>=7.3.1',                # BSD license
+]
+
+# Support for WAMP-SCRAM authentication
+extras_require_scram = [
+    'cffi>=1.14.5',             # MIT license
+    'argon2_cffi>=20.1.0',      # MIT license
+    'passlib>=1.7.4',           # BSD license
+]
+
+# Support native vector (SIMD) acceleration included with Autobahn
+extras_require_nvx = [
+    'cffi>=1.14.5',             # MIT license
+]
+
+# cffi based extension modules to build, currently only NVX
+cffi_modules = []
+if 'AUTOBAHN_USE_NVX' not in os.environ or os.environ['AUTOBAHN_USE_NVX'] not in ['0', 'false']:
+    cffi_modules.append('autobahn/nvx/_utf8validator.py:ffi')
+
+extras_require_xbr = [
+    # XBR contracts and ABI file bundle
+    'xbr>=21.2.1',              # Apache 2.0
+
+    # CLI handling and color terminal output
+    'click>=8.1.2',             # BSD license
+
+    # the following is needed for XBR basics and XBR IDL code generation
+    'cbor2>=5.2.0',             # MIT license
+    'zlmdb>=21.2.1',            # MIT license
+    'twisted>=20.3.0',          # MIT license
+    'web3>=5.29.0',             # MIT license
+
+    # the following is needed for EIP712 ("signed typed data"):
+    'rlp>=2.0.1',               # MIT license
+    'py-eth-sig-utils>=0.4.0',  # MIT license (https://github.com/rmeissner/py-eth-sig-utils)
+    'py-ecc>=5.1.0',            # MIT license (https://github.com/ethereum/py_ecc)
+    'eth-abi>=2.1.1',           # MIT license (https://github.com/ethereum/eth-abi)
+
+    # the following is needed (at least) for BIP32/39 mnemonic processing
+    'mnemonic>=0.19',           # MIT license (https://github.com/trezor/python-mnemonic)
+    'base58>=2.1.0',            # MIT license (https://github.com/keis/base58)
+    'ecdsa>=0.16.1',            # MIT license (https://github.com/warner/python-ecdsa)
+    'py-multihash>=2.0.1',      # MIT license (https://github.com/multiformats/py-multihash / https://pypi.org/project/py-multihash/)
+
+    # the following is needed for the WAMP/XBR IDL code generator
+    'jinja2>=2.11.3',           # BSD license
+    'yapf==0.29.0',             # Apache 2.0
+
+    # the following is needed for XBR account synch and device pairing
+    'spake2>=0.8',              # MIT license (https://github.com/warner/python-spake2/blob/master/LICENSE)
+    'hkdf>=0.0.3',              # BSD 2-Clause "Simplified" License
+]
+
+# required for UI based tools, e.g. xbrnetwork-ui (autobahn.xbr._gui:_main)
+extras_require_ui = [
+    # the following is needed for the graphical XBR onboarding UI
+    'PyGObject>=3.40.0',        # GNU Lesser General Public License v2 or later (LGPLv2+) (GNU LGPL)
 ]
 
 # everything
-extras_require_all = extras_require_twisted + extras_require_asyncio + \
-    extras_require_accelerate + extras_require_compress + \
-    extras_require_serialization + extras_require_encryption
+extras_require_all = extras_require_twisted + extras_require_accelerate + extras_require_compress + \
+                     extras_require_serialization + extras_require_encryption + extras_require_scram + \
+                     extras_require_nvx + extras_require_xbr + extras_require_ui
 
-# extras_require_all += extras_require_compress
+packages = [
+    'autobahn',
+    'autobahn.test',
+    'autobahn.wamp',
+    'autobahn.wamp.gen',
+    'autobahn.wamp.gen.wamp',
+    'autobahn.wamp.gen.wamp.proto',
+    'autobahn.wamp.test',
+    'autobahn.websocket',
+    'autobahn.websocket.test',
+    'autobahn.rawsocket',
+    'autobahn.rawsocket.test',
+    'autobahn.asyncio',
+    'autobahn.twisted',
+    'autobahn.twisted.test',
+    'autobahn.twisted.testing',
+    'autobahn.nvx',
+    'autobahn.nvx.test',
+    'twisted.plugins',
+]
+
+xbr_packages = [
+    'autobahn.xbr',
+    'autobahn.xbr.test',
+    'autobahn.asyncio.xbr',
+    'autobahn.twisted.xbr',
+]
+
+package_data = {'autobahn.asyncio': ['./test/*']}
+
+entry_points = {
+    "console_scripts": [
+        "wamp = autobahn.__main__:_main",
+    ]
+}
+
+if 'AUTOBAHN_STRIP_XBR' in os.environ:
+    # force regeneration of egg-info manifest for stripped install
+    shutil.rmtree('autobahn.egg-info', ignore_errors=True)
+else:
+    extras_require_all += extras_require_xbr
+    packages += xbr_packages
+    package_data['xbr'] = [
+        './xbr/templates/py-autobahn/*.py.jinja2',
+        './xbr/templates/sol-eip712/*.sol.jinja2',
+    ]
+    entry_points['console_scripts'] += ["xbrnetwork = autobahn.xbr._cli:_main"]
+    entry_points['console_scripts'] += ["xbrnetwork-ui = autobahn.xbr._gui:_main"]
 
 # development dependencies
-extras_require_dev = [
-    # flake8 will install the version "it needs"
-    # "pep8>=1.6.2",                      # MIT license
-    "pep8-naming>=0.3.3",               # MIT license
-    "flake8>=2.5.1",                    # MIT license
-    "pyflakes>=1.0.0",                  # MIT license
-    "mock>=1.3.0",                      # BSD license
-    "pytest>=2.8.6",                    # MIT license
-    "unittest2>=1.1.0",                 # BSD license
-    "twine>=1.6.5",                     # Apache 2.0
-    'sphinx>=1.2.3',                    # BSD
-    'pyenchant>=1.6.6',                 # LGPL
-    'sphinxcontrib-spelling>=2.1.2',    # BSD
-    'sphinx_rtd_theme>=0.1.9',          # BSD
-
-    # pytest-asyncio 0.6 has dropped support for Py <3.5
-    # https://github.com/pytest-dev/pytest-asyncio/issues/57
-    'pytest_asyncio<0.6',               # Apache 2.0
-
-    'pytest-aiohttp',                   # Apache 2.0
-    'awscli',                           # Apache 2.0
-    'qualname',                         # BSD
-]
+extras_require_dev = []
+with open('requirements-dev.txt') as f:
+    for line in f.read().splitlines():
+        line = line.strip()
+        if not line.startswith('#'):
+            extras_require_dev.append(line)
 
 # for testing by users with "python setup.py test" (not Tox, which we use)
 test_requirements = [
-    "pytest>=2.8.6",        # MIT license
-    "mock>=1.3.0",          # BSD license
+    "pytest>=2.8.6,<3.3.0",             # MIT license
 ]
 
 
@@ -174,50 +243,52 @@ class PyTest(test_command):
 
 setup(
     name='autobahn',
-    version=__version__,
+    version=__version__,  # noqa
     description='WebSocket client & server library, WAMP real-time framework',
     long_description=docstr,
     license='MIT License',
     author='Crossbar.io Technologies GmbH',
     url='http://crossbar.io/autobahn',
+    project_urls={
+        'Source': 'https://github.com/crossbario/autobahn-python',
+    },
     platforms='Any',
     install_requires=[
-        'six>=1.10.0',      # MIT license
-        'txaio>=2.7.0',     # MIT license
+        'txaio>=21.2.1',        # MIT license (https://github.com/crossbario/txaio)
+        'cryptography>=3.4.6',  # BSD *or* Apache license (https://github.com/pyca/cryptography)
+        'hyperlink>=21.0.0',    # MIT license (https://github.com/python-hyper/hyperlink)
+        'setuptools',           # MIT license (https://github.com/pypa/setuptools)
     ],
     extras_require={
         'all': extras_require_all,
-        'asyncio': extras_require_asyncio,
+        'asyncio': [],  # backwards compatibility
         'twisted': extras_require_twisted,
         'accelerate': extras_require_accelerate,
         'compress': extras_require_compress,
         'serialization': extras_require_serialization,
         'encryption': extras_require_encryption,
+        'scram': extras_require_scram,
+        'nvx': extras_require_nvx,
         'dev': extras_require_dev,
+        'xbr': extras_require_xbr,
+        'ui': extras_require_ui,
     },
     tests_require=test_requirements,
     cmdclass={
         'test': PyTest
     },
-    packages=[
-        'autobahn',
-        'autobahn.test',
-        'autobahn.wamp',
-        'autobahn.wamp.test',
-        'autobahn.websocket',
-        'autobahn.websocket.test',
-        'autobahn.rawsocket',
-        'autobahn.rawsocket.test',
-        'autobahn.asyncio',
-        'autobahn.twisted',
-        'twisted.plugins'
-    ],
-    package_data={'autobahn.asyncio': ['test/*']},
+    packages=packages,
+    package_data=package_data,
+    cffi_modules=cffi_modules,
+
+    entry_points=entry_points,
 
     # this flag will make files from MANIFEST.in go into _source_ distributions only
     include_package_data=True,
 
     zip_safe=False,
+
+    python_requires='>=3.7',
 
     # http://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=["License :: OSI Approved :: MIT License",
@@ -227,16 +298,13 @@ setup(
                  "Intended Audience :: Developers",
                  "Operating System :: OS Independent",
                  "Programming Language :: Python",
-                 "Programming Language :: Python :: 2",
-                 "Programming Language :: Python :: 2.7",
                  "Programming Language :: Python :: 3",
-                 "Programming Language :: Python :: 3.3",
-                 "Programming Language :: Python :: 3.4",
-                 "Programming Language :: Python :: 3.5",
-                 "Programming Language :: Python :: 3.6",
+                 "Programming Language :: Python :: 3.7",
+                 "Programming Language :: Python :: 3.8",
+                 "Programming Language :: Python :: 3.9",
+                 "Programming Language :: Python :: 3.10",
                  "Programming Language :: Python :: Implementation :: CPython",
                  "Programming Language :: Python :: Implementation :: PyPy",
-                 "Programming Language :: Python :: Implementation :: Jython",
                  "Topic :: Internet",
                  "Topic :: Internet :: WWW/HTTP",
                  "Topic :: Communications",
@@ -244,7 +312,7 @@ setup(
                  "Topic :: Software Development :: Libraries",
                  "Topic :: Software Development :: Libraries :: Python Modules",
                  "Topic :: Software Development :: Object Brokering"],
-    keywords='autobahn crossbar websocket realtime rfc6455 wamp rpc pubsub twisted asyncio'
+    keywords='autobahn crossbar websocket realtime rfc6455 wamp rpc pubsub twisted asyncio xbr data-markets blockchain ethereum'
 )
 
 
@@ -259,15 +327,10 @@ else:
     # Make Twisted regenerate the dropin.cache, if possible. This is necessary
     # because in a site-wide install, dropin.cache cannot be rewritten by
     # normal users.
-    if _HAD_SIX:
-        # only proceed if we had had six already _before_ installing AutobahnPython,
-        # since it produces errs/warns otherwise
-        try:
-            from twisted.plugin import IPlugin, getPlugins
-            list(getPlugins(IPlugin))
-        except Exception as e:
-            print("Failed to update Twisted plugin cache: {0}".format(e))
-        else:
-            print("Twisted dropin.cache regenerated.")
+    try:
+        from twisted.plugin import IPlugin, getPlugins
+        list(getPlugins(IPlugin))
+    except Exception as e:
+        print("Failed to update Twisted plugin cache: {0}".format(e))
     else:
-        print("Warning: regenerate of Twisted dropin.cache skipped (can't run when six wasn't there before)")
+        print("Twisted dropin.cache regenerated.")

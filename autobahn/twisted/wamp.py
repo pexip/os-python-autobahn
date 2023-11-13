@@ -24,17 +24,25 @@
 #
 ###############################################################################
 
-from __future__ import absolute_import
-
-import six
 import inspect
 import binascii
 import random
+from typing import Optional, Dict, Any, List, Union
 
 import txaio
+from autobahn.websocket.protocol import WebSocketProtocol
+
 txaio.use_twisted()  # noqa
 
-from twisted.internet.defer import inlineCallbacks, succeed
+from twisted.internet.defer import inlineCallbacks, succeed, Deferred
+from twisted.application import service
+from twisted.internet.interfaces import IReactorCore, IStreamClientEndpoint
+
+try:
+    from twisted.internet.ssl import CertificateOptions
+except ImportError:
+    # PyOpenSSL / TLS not available
+    CertificateOptions = Any
 
 from autobahn.util import public
 
@@ -48,9 +56,8 @@ from autobahn.websocket.compress import PerMessageDeflateOffer, \
     PerMessageDeflateResponse, PerMessageDeflateResponseAccept
 
 from autobahn.wamp import protocol, auth
-from autobahn.wamp.interfaces import IAuthenticator
+from autobahn.wamp.interfaces import ITransportHandler, ISession, IAuthenticator, ISerializer
 from autobahn.wamp.types import ComponentConfig
-
 
 __all__ = [
     'ApplicationSession',
@@ -63,13 +70,6 @@ __all__ = [
     'Session',
     # 'run',  # should probably move this method to here? instead of component
 ]
-
-try:
-    from twisted.application import service
-except (ImportError, SyntaxError):
-    # Not on PY3 yet
-    service = None
-    __all__.pop(__all__.index('Service'))
 
 
 @public
@@ -86,12 +86,18 @@ class ApplicationSession(protocol.ApplicationSession):
     log = txaio.make_logger()
 
 
+ITransportHandler.register(ApplicationSession)
+
+# ISession.register collides with the abc.ABCMeta.register method
+ISession.abc_register(ApplicationSession)
+
+
 class ApplicationSessionFactory(protocol.ApplicationSessionFactory):
     """
     WAMP application session factory for Twisted-based applications.
     """
 
-    session = ApplicationSession
+    session: ApplicationSession = ApplicationSession
     """
     The application session class this application session factory will use. Defaults to :class:`autobahn.twisted.wamp.ApplicationSession`.
     """
@@ -112,68 +118,50 @@ class ApplicationRunner(object):
     log = txaio.make_logger()
 
     def __init__(self,
-                 url,
-                 realm=None,
-                 extra=None,
-                 serializers=None,
-                 ssl=None,
-                 proxy=None,
-                 headers=None,
-                 max_retries=None,
-                 initial_retry_delay=None,
-                 max_retry_delay=None,
-                 retry_delay_growth=None,
-                 retry_delay_jitter=None):
+                 url: str,
+                 realm: Optional[str] = None,
+                 extra: Optional[Dict[str, Any]] = None,
+                 serializers: Optional[List[ISerializer]] = None,
+                 ssl: Optional[CertificateOptions] = None,
+                 proxy: Optional[Dict[str, Any]] = None,
+                 headers: Optional[Dict[str, Any]] = None,
+                 websocket_options: Optional[Dict[str, Any]] = None,
+                 max_retries: Optional[int] = None,
+                 initial_retry_delay: Optional[float] = None,
+                 max_retry_delay: Optional[float] = None,
+                 retry_delay_growth: Optional[float] = None,
+                 retry_delay_jitter: Optional[float] = None):
         """
 
-        :param url: The WebSocket URL of the WAMP router to connect to (e.g. `ws://somehost.com:8090/somepath`)
-        :type url: str
-
+        :param url: The WebSocket URL of the WAMP router to connect to (e.g. `ws://example.com:8080/mypath`)
         :param realm: The WAMP realm to join the application session to.
-        :type realm: str
-
         :param extra: Optional extra configuration to forward to the application component.
-        :type extra: dict
-
         :param serializers: A list of WAMP serializers to use (or None for default serializers).
            Serializers must implement :class:`autobahn.wamp.interfaces.ISerializer`.
         :type serializers: list
-
         :param ssl: (Optional). If specified this should be an
             instance suitable to pass as ``sslContextFactory`` to
             :class:`twisted.internet.endpoints.SSL4ClientEndpoint`` such
             as :class:`twisted.internet.ssl.CertificateOptions`. Leaving
-            it as ``None`` will use the result of calling Twisted's
+            it as ``None`` will use the result of calling Twisted
             :meth:`twisted.internet.ssl.platformTrust` which tries to use
             your distribution's CA certificates.
-        :type ssl: :class:`twisted.internet.ssl.CertificateOptions`
-
-        :param proxy: Explicit proxy server to use; a dict with ``host`` and ``port`` keys
-        :type proxy: dict or None
-
+        :param proxy: Explicit proxy server to use; a dict with ``host`` and ``port`` keys.
         :param headers: Additional headers to send (only applies to WAMP-over-WebSocket).
-        :type headers: dict
-
+        :param websocket_options: Specific WebSocket options to set (only applies to WAMP-over-WebSocket).
+            If not provided, conservative and practical default are chosen.
         :param max_retries: Maximum number of reconnection attempts. Unlimited if set to -1.
-        :type max_retries: int
-
         :param initial_retry_delay: Initial delay for reconnection attempt in seconds (Default: 1.0s).
-        :type initial_retry_delay: float
-
         :param max_retry_delay: Maximum delay for reconnection attempts in seconds (Default: 60s).
-        :type max_retry_delay: float
-
-        :param retry_delay_growth: The growth factor applied to the retry delay between reconnection attempts (Default 1.5).
-        :type retry_delay_growth: float
-
-        :param retry_delay_jitter: A 0-argument callable that introduces nose into the delay. (Default random.random)
-        :type retry_delay_jitter: float
+        :param retry_delay_growth: The growth factor applied to the retry delay between reconnection
+            attempts (Default 1.5).
+        :param retry_delay_jitter: A 0-argument callable that introduces noise into the
+            delay (Default ``random.random``).
         """
-        assert(type(url) == six.text_type)
-        assert(realm is None or type(realm) == six.text_type)
-        assert(extra is None or type(extra) == dict)
-        assert(headers is None or type(headers) == dict)
-        assert(proxy is None or type(proxy) == dict)
+        # IMPORTANT: keep this, as it is tested in
+        # autobahn.twisted.test.test_tx_application_runner.TestApplicationRunner.test_runner_bad_proxy
+        assert (proxy is None or type(proxy) == dict)
+
         self.url = url
         self.realm = realm
         self.extra = extra or dict()
@@ -181,6 +169,7 @@ class ApplicationRunner(object):
         self.ssl = ssl
         self.proxy = proxy
         self.headers = headers
+        self.websocket_options = websocket_options
         self.max_retries = max_retries
         self.initial_retry_delay = initial_retry_delay
         self.max_retry_delay = max_retry_delay
@@ -198,32 +187,38 @@ class ApplicationRunner(object):
         Stop reconnecting, if auto-reconnecting was enabled.
         """
         self.log.debug('{klass}.stop()', klass=self.__class__.__name__)
+
         if self._client_service:
             return self._client_service.stopService()
         else:
             return succeed(None)
 
     @public
-    def run(self, make, start_reactor=True, auto_reconnect=False, log_level='info'):
+    def run(self, make, start_reactor: bool = True, auto_reconnect: bool = False,
+            log_level: str = 'info', endpoint: Optional[IStreamClientEndpoint] = None,
+            reactor: Optional[IReactorCore] = None) -> Union[type(None), Deferred]:
         """
         Run the application component.
 
         :param make: A factory that produces instances of :class:`autobahn.twisted.wamp.ApplicationSession`
            when called with an instance of :class:`autobahn.wamp.types.ComponentConfig`.
-        :type make: callable
-
         :param start_reactor: When ``True`` (the default) this method starts
            the Twisted reactor and doesn't return until the reactor
            stops. If there are any problems starting the reactor or
            connect()-ing, we stop the reactor and raise the exception
            back to the caller.
-
-        :returns: None is returned, unless you specify
+        :param auto_reconnect:
+        :param log_level:
+        :param endpoint:
+        :param reactor:
+        :return: None is returned, unless you specify
             ``start_reactor=False`` in which case the Deferred that
             connect() returns is returned; this will callback() with
             an IProtocol instance, which will actually be an instance
             of :class:`WampWebSocketClientProtocol`
         """
+        self.log.debug('{klass}.run()', klass=self.__class__.__name__)
+
         if start_reactor:
             # only select framework, set loop and start logging when we are asked
             # start the reactor - otherwise we are running in a program that likely
@@ -236,7 +231,7 @@ class ApplicationRunner(object):
         if callable(make):
             # factory for use ApplicationSession
             def create():
-                cfg = ComponentConfig(self.realm, self.extra)
+                cfg = ComponentConfig(self.realm, self.extra, runner=self)
                 try:
                     session = make(cfg)
                 except Exception:
@@ -249,8 +244,8 @@ class ApplicationRunner(object):
         else:
             create = make
 
-        if self.url.startswith(u'rs'):
-            # try to parse RawSocket URL ..
+        if self.url.startswith('rs'):
+            # try to parse RawSocket URL
             isSecure, host, port = parse_rs_url(self.url)
 
             # use the first configured serializer if any (which means, auto-choose "best")
@@ -260,7 +255,7 @@ class ApplicationRunner(object):
             transport_factory = WampRawSocketClientFactory(create, serializer=serializer)
 
         else:
-            # try to parse WebSocket URL ..
+            # try to parse WebSocket URL
             isSecure, host, port, resource, path, params = parse_ws_url(self.url)
 
             # create a WAMP-over-WebSocket transport client factory
@@ -270,57 +265,81 @@ class ApplicationRunner(object):
             # - http://crossbar.io/docs/WebSocket-Compression/#production-settings
             # - http://crossbar.io/docs/WebSocket-Options/#production-settings
 
-            # The permessage-deflate extensions offered to the server ..
+            # The permessage-deflate extensions offered to the server
             offers = [PerMessageDeflateOffer()]
 
-            # Function to accept permessage_delate responses from the server ..
+            # Function to accept permessage-deflate responses from the server
             def accept(response):
                 if isinstance(response, PerMessageDeflateResponse):
                     return PerMessageDeflateResponseAccept(response)
 
-            # set WebSocket options for all client connections
-            transport_factory.setProtocolOptions(maxFramePayloadSize=1048576,
-                                                 maxMessagePayloadSize=1048576,
-                                                 autoFragmentSize=65536,
-                                                 failByDrop=False,
-                                                 openHandshakeTimeout=2.5,
-                                                 closeHandshakeTimeout=1.,
-                                                 tcpNoDelay=True,
-                                                 autoPingInterval=10.,
-                                                 autoPingTimeout=5.,
-                                                 autoPingSize=4,
-                                                 perMessageCompressionOffers=offers,
-                                                 perMessageCompressionAccept=accept)
+            # default WebSocket options for all client connections
+            protocol_options = {
+                'version': WebSocketProtocol.DEFAULT_SPEC_VERSION,
+                'utf8validateIncoming': True,
+                'acceptMaskedServerFrames': False,
+                'maskClientFrames': True,
+                'applyMask': True,
+                'maxFramePayloadSize': 1048576,
+                'maxMessagePayloadSize': 1048576,
+                'autoFragmentSize': 65536,
+                'failByDrop': True,
+                'echoCloseCodeReason': False,
+                'serverConnectionDropTimeout': 1.,
+                'openHandshakeTimeout': 2.5,
+                'closeHandshakeTimeout': 1.,
+                'tcpNoDelay': True,
+                'perMessageCompressionOffers': offers,
+                'perMessageCompressionAccept': accept,
+                'autoPingInterval': 10.,
+                'autoPingTimeout': 5.,
+                'autoPingSize': 12,
+
+                # see: https://github.com/crossbario/autobahn-python/issues/1327 and
+                # _cancelAutoPingTimeoutCall
+                'autoPingRestartOnAnyTraffic': True,
+            }
+
+            # let user override above default options
+            if self.websocket_options:
+                protocol_options.update(self.websocket_options)
+
+            # set websocket protocol options on Autobahn/Twisted protocol factory, from where it will
+            # be applied for every Autobahn/Twisted protocol instance from the factory
+            transport_factory.setProtocolOptions(**protocol_options)
 
         # supress pointless log noise
         transport_factory.noisy = False
 
-        # if user passed ssl= but isn't using isSecure, we'll never
-        # use the ssl argument which makes no sense.
-        context_factory = None
-        if self.ssl is not None:
-            if not isSecure:
-                raise RuntimeError(
-                    'ssl= argument value passed to %s conflicts with the "ws:" '
-                    'prefix of the url argument. Did you mean to use "wss:"?' %
-                    self.__class__.__name__)
-            context_factory = self.ssl
-        elif isSecure:
-            from twisted.internet.ssl import optionsForClientTLS
-            context_factory = optionsForClientTLS(host)
-
-        from twisted.internet import reactor
-        if self.proxy is not None:
-            from twisted.internet.endpoints import TCP4ClientEndpoint
-            client = TCP4ClientEndpoint(reactor, self.proxy['host'], self.proxy['port'])
-            transport_factory.contextFactory = context_factory
-        elif isSecure:
-            from twisted.internet.endpoints import SSL4ClientEndpoint
-            assert context_factory is not None
-            client = SSL4ClientEndpoint(reactor, host, port, context_factory)
+        if endpoint:
+            client = endpoint
         else:
-            from twisted.internet.endpoints import TCP4ClientEndpoint
-            client = TCP4ClientEndpoint(reactor, host, port)
+            # if user passed ssl= but isn't using isSecure, we'll never
+            # use the ssl argument which makes no sense.
+            context_factory = None
+            if self.ssl is not None:
+                if not isSecure:
+                    raise RuntimeError(
+                        'ssl= argument value passed to %s conflicts with the "ws:" '
+                        'prefix of the url argument. Did you mean to use "wss:"?' %
+                        self.__class__.__name__)
+                context_factory = self.ssl
+            elif isSecure:
+                from twisted.internet.ssl import optionsForClientTLS
+                context_factory = optionsForClientTLS(host)
+
+            from twisted.internet import reactor
+            if self.proxy is not None:
+                from twisted.internet.endpoints import TCP4ClientEndpoint
+                client = TCP4ClientEndpoint(reactor, self.proxy['host'], self.proxy['port'])
+                transport_factory.contextFactory = context_factory
+            elif isSecure:
+                from twisted.internet.endpoints import SSL4ClientEndpoint
+                assert context_factory is not None
+                client = SSL4ClientEndpoint(reactor, host, port, context_factory)
+            else:
+                from twisted.internet.endpoints import TCP4ClientEndpoint
+                client = TCP4ClientEndpoint(reactor, host, port)
 
         # as the reactor shuts down, we wish to wait until we've sent
         # out our "Goodbye" message; leave() returns a Deferred that
@@ -353,27 +372,39 @@ class ApplicationRunner(object):
             # this code path is automatically reconnecting ..
             self.log.debug('using t.a.i.ClientService')
 
-            if self.max_retries or self.initial_retry_delay or self.max_retry_delay or self.retry_delay_growth or self.retry_delay_jitter:
-                kwargs = {}
-                for key, val in [('initialDelay', self.initial_retry_delay),
-                                 ('maxDelay', self.max_retry_delay),
-                                 ('factor', self.retry_delay_growth),
-                                 ('jitter', lambda: random.random() * self.retry_delay_jitter)]:
-                    if val:
-                        kwargs[key] = val
+            if (self.max_retries is not None or self.initial_retry_delay is not None or self.max_retry_delay is not None or self.retry_delay_growth is not None or self.retry_delay_jitter is not None):
 
-                # retry policy that will only try to reconnect if we connected
-                # successfully at least once before (so it fails on host unreachable etc ..)
-                def retry(failed_attempts):
-                    if self._connect_successes > 0 and (self.max_retries == -1 or failed_attempts < self.max_retries):
-                        return backoffPolicy(**kwargs)(failed_attempts)
-                    else:
-                        print('hit stop')
-                        self.stop()
-                        return 100000000000000
+                if self.max_retry_delay > 0:
+                    kwargs = {}
+
+                    def _jitter():
+                        j = 1 if self.retry_delay_jitter is None else self.retry_delay_jitter
+                        return random.random() * j
+
+                    for key, val in [('initialDelay', self.initial_retry_delay),
+                                     ('maxDelay', self.max_retry_delay),
+                                     ('factor', self.retry_delay_growth),
+                                     ('jitter', _jitter)]:
+                        if val is not None:
+                            kwargs[key] = val
+
+                    # retry policy that will only try to reconnect if we connected
+                    # successfully at least once before (so it fails on host unreachable etc ..)
+                    def retry(failed_attempts):
+                        if self._connect_successes > 0 and (self.max_retries == -1 or failed_attempts < self.max_retries):
+                            return backoffPolicy(**kwargs)(failed_attempts)
+                        else:
+                            print('hit stop')
+                            self.stop()
+                            return 100000000000000
+                else:
+                    # immediately reconnect (zero delay)
+                    def retry(_):
+                        return 0
             else:
                 retry = backoffPolicy()
 
+            # https://twistedmatrix.com/documents/current/api/twisted.application.internet.ClientService.html
             self._client_service = ClientService(client, transport_factory, retryPolicy=retry)
             self._client_service.startService()
 
@@ -407,10 +438,16 @@ class ApplicationRunner(object):
             # now enter the Twisted reactor loop
             reactor.run()
 
-            # if we exited due to a connection error, raise that to the
-            # caller
+            # if the ApplicationSession sets an "error" key on the self.config.extra dictionary, which
+            # has been set to the self.extra dictionary, extract the Exception from that and re-raise
+            # it as the very last one (see below) exciting back to the caller of self.run()
+            app_error = self.extra.get('error', None)
+
+            # if we exited due to a connection error, raise that to the caller
             if connect_error.exception:
                 raise connect_error.exception
+            elif app_error:
+                raise app_error
 
         else:
             # let the caller handle any errors
@@ -437,7 +474,7 @@ class _ApplicationSession(ApplicationSession):
     @inlineCallbacks
     def onConnect(self):
         """
-        Implements :func:`autobahn.wamp.interfaces.ISession.onConnect`
+        Implements :meth:`autobahn.wamp.interfaces.ISession.onConnect`
         """
         yield self.app._fire_signal('onconnect')
         self.join(self.config.realm)
@@ -445,7 +482,7 @@ class _ApplicationSession(ApplicationSession):
     @inlineCallbacks
     def onJoin(self, details):
         """
-        Implements :func:`autobahn.wamp.interfaces.ISession.onJoin`
+        Implements :meth:`autobahn.wamp.interfaces.ISession.onJoin`
         """
         for uri, proc in self.app._procs:
             yield self.register(proc, uri)
@@ -458,7 +495,7 @@ class _ApplicationSession(ApplicationSession):
     @inlineCallbacks
     def onLeave(self, details):
         """
-        Implements :func:`autobahn.wamp.interfaces.ISession.onLeave`
+        Implements :meth:`autobahn.wamp.interfaces.ISession.onLeave`
         """
         yield self.app._fire_signal('onleave')
         self.disconnect()
@@ -466,7 +503,7 @@ class _ApplicationSession(ApplicationSession):
     @inlineCallbacks
     def onDisconnect(self):
         """
-        Implements :func:`autobahn.wamp.interfaces.ISession.onDisconnect`
+        Implements :meth:`autobahn.wamp.interfaces.ISession.onDisconnect`
         """
         yield self.app._fire_signal('ondisconnect')
 
@@ -514,7 +551,7 @@ class Application(object):
         self.session = _ApplicationSession(config, self)
         return self.session
 
-    def run(self, url=u"ws://localhost:8080/ws", realm=u"realm1", start_reactor=True):
+    def run(self, url="ws://localhost:8080/ws", realm="realm1", start_reactor=True):
         """
         Run the application.
 
@@ -677,91 +714,91 @@ class Application(object):
                 self.log.info("Warning: exception in signal handler swallowed: {err}", err=e)
 
 
-if service:
-    # Don't define it if Twisted's service support isn't here
+class Service(service.MultiService):
+    """
+    A WAMP application as a twisted service.
+    The application object provides a simple way of creating, debugging and running WAMP application
+    components inside a traditional twisted application
 
-    class Service(service.MultiService):
+    This manages application lifecycle of the wamp connection using startService and stopService
+    Using services also allows to create integration tests that properly terminates their connections
+
+    It can host a WAMP application component in a WAMP-over-WebSocket client
+    connecting to a WAMP router.
+    """
+    factory = WampWebSocketClientFactory
+
+    def __init__(self, url, realm, make, extra=None, context_factory=None):
         """
-        A WAMP application as a twisted service.
-        The application object provides a simple way of creating, debugging and running WAMP application
-        components inside a traditional twisted application
 
-        This manages application lifecycle of the wamp connection using startService and stopService
-        Using services also allows to create integration tests that properly terminates their connections
+        :param url: The WebSocket URL of the WAMP router to connect to (e.g. `ws://somehost.com:8090/somepath`)
+        :type url: unicode
 
-        It can host a WAMP application component in a WAMP-over-WebSocket client
-        connecting to a WAMP router.
+        :param realm: The WAMP realm to join the application session to.
+        :type realm: unicode
+
+        :param make: A factory that produces instances of :class:`autobahn.asyncio.wamp.ApplicationSession`
+           when called with an instance of :class:`autobahn.wamp.types.ComponentConfig`.
+        :type make: callable
+
+        :param extra: Optional extra configuration to forward to the application component.
+        :type extra: dict
+
+        :param context_factory: optional, only for secure connections. Passed as contextFactory to
+            the ``listenSSL()`` call; see https://twistedmatrix.com/documents/current/api/twisted.internet.interfaces.IReactorSSL.connectSSL.html
+        :type context_factory: twisted.internet.ssl.ClientContextFactory or None
+
+        You can replace the attribute factory in order to change connectionLost or connectionFailed behaviour.
+        The factory attribute must return a WampWebSocketClientFactory object
         """
-        factory = WampWebSocketClientFactory
+        self.url = url
+        self.realm = realm
+        self.extra = extra or dict()
+        self.make = make
+        self.context_factory = context_factory
+        service.MultiService.__init__(self)
+        self.setupService()
 
-        def __init__(self, url, realm, make, extra=None, context_factory=None):
-            """
+    def setupService(self):
+        """
+        Setup the application component.
+        """
+        is_secure, host, port, resource, path, params = parse_ws_url(self.url)
 
-            :param url: The WebSocket URL of the WAMP router to connect to (e.g. `ws://somehost.com:8090/somepath`)
-            :type url: unicode
+        # factory for use ApplicationSession
+        def create():
+            cfg = ComponentConfig(self.realm, self.extra)
+            session = self.make(cfg)
+            return session
 
-            :param realm: The WAMP realm to join the application session to.
-            :type realm: unicode
+        # create a WAMP-over-WebSocket transport client factory
+        transport_factory = self.factory(create, url=self.url)
 
-            :param make: A factory that produces instances of :class:`autobahn.asyncio.wamp.ApplicationSession`
-               when called with an instance of :class:`autobahn.wamp.types.ComponentConfig`.
-            :type make: callable
+        # setup the client from a Twisted endpoint
 
-            :param extra: Optional extra configuration to forward to the application component.
-            :type extra: dict
+        if is_secure:
+            from twisted.application.internet import SSLClient
+            ctx = self.context_factory
+            if ctx is None:
+                from twisted.internet.ssl import optionsForClientTLS
+                ctx = optionsForClientTLS(host)
+            client = SSLClient(host, port, transport_factory, contextFactory=ctx)
+        else:
+            if self.context_factory is not None:
+                raise Exception("context_factory specified on non-secure URI")
+            from twisted.application.internet import TCPClient
+            client = TCPClient(host, port, transport_factory)
 
-            :param context_factory: optional, only for secure connections. Passed as contextFactory to
-                the ``listenSSL()`` call; see https://twistedmatrix.com/documents/current/api/twisted.internet.interfaces.IReactorSSL.connectSSL.html
-            :type context_factory: twisted.internet.ssl.ClientContextFactory or None
-
-            You can replace the attribute factory in order to change connectionLost or connectionFailed behaviour.
-            The factory attribute must return a WampWebSocketClientFactory object
-            """
-            self.url = url
-            self.realm = realm
-            self.extra = extra or dict()
-            self.make = make
-            self.context_factory = context_factory
-            service.MultiService.__init__(self)
-            self.setupService()
-
-        def setupService(self):
-            """
-            Setup the application component.
-            """
-            is_secure, host, port, resource, path, params = parse_ws_url(self.url)
-
-            # factory for use ApplicationSession
-            def create():
-                cfg = ComponentConfig(self.realm, self.extra)
-                session = self.make(cfg)
-                return session
-
-            # create a WAMP-over-WebSocket transport client factory
-            transport_factory = self.factory(create, url=self.url)
-
-            # setup the client from a Twisted endpoint
-
-            if is_secure:
-                from twisted.application.internet import SSLClient
-                ctx = self.context_factory
-                if ctx is None:
-                    from twisted.internet.ssl import optionsForClientTLS
-                    ctx = optionsForClientTLS(host)
-                client = SSLClient(host, port, transport_factory, contextFactory=ctx)
-            else:
-                if self.context_factory is not None:
-                    raise Exception("context_factory specified on non-secure URI")
-                from twisted.application.internet import TCPClient
-                client = TCPClient(host, port, transport_factory)
-
-            client.setServiceParent(self)
+        client.setServiceParent(self)
 
 
 # new API
 class Session(protocol._SessionShim):
     # XXX these methods are redundant, but put here for possibly
     # better clarity; maybe a bad idea.
+
+    def on_welcome(self, welcome_msg):
+        pass
 
     def on_join(self, details):
         pass
@@ -782,39 +819,44 @@ class AuthCryptoSign(object):
     def __init__(self, **kw):
         # should put in checkconfig or similar
         for key in kw.keys():
-            if key not in [u'authextra', u'authid', u'authrole', u'privkey']:
+            if key not in ['authextra', 'authid', 'authrole', 'privkey']:
                 raise ValueError(
                     "Unexpected key '{}' for {}".format(key, self.__class__.__name__)
                 )
-        for key in [u'privkey', u'authid']:
+        for key in ['privkey']:
             if key not in kw:
                 raise ValueError(
                     "Must provide '{}' for cryptosign".format(key)
                 )
         for key in kw.get('authextra', dict()):
-            if key not in [u'pubkey']:
+            if key not in ['pubkey', 'channel_binding', 'trustroot', 'challenge']:
                 raise ValueError(
                     "Unexpected key '{}' in 'authextra'".format(key)
                 )
 
-        from autobahn.wamp.cryptosign import SigningKey
-        self._privkey = SigningKey.from_key_bytes(
-            binascii.a2b_hex(kw[u'privkey'])
+        from autobahn.wamp.cryptosign import CryptosignKey
+        self._privkey = CryptosignKey.from_bytes(
+            binascii.a2b_hex(kw['privkey'])
         )
 
-        if u'pubkey' in kw.get(u'authextra', dict()):
-            pubkey = kw[u'authextra'][u'pubkey']
+        if 'pubkey' in kw.get('authextra', dict()):
+            pubkey = kw['authextra']['pubkey']
             if pubkey != self._privkey.public_key():
                 raise ValueError(
                     "Public key doesn't correspond to private key"
                 )
         else:
-            kw[u'authextra'] = kw.get(u'authextra', dict())
-            kw[u'authextra'][u'pubkey'] = self._privkey.public_key()
+            kw['authextra'] = kw.get('authextra', dict())
+            kw['authextra']['pubkey'] = self._privkey.public_key()
         self._args = kw
 
     def on_challenge(self, session, challenge):
-        return self._privkey.sign_challenge(session, challenge)
+        # sign the challenge with our private key.
+        channel_id_type = self._args['authextra'].get('channel_binding', None)
+        channel_id = self.transport.transport_details.channel_id.get(channel_id_type, None)
+        signed_challenge = self._privkey.sign_challenge(challenge, channel_id=channel_id,
+                                                        channel_id_type=channel_id_type)
+        return signed_challenge
 
 
 IAuthenticator.register(AuthCryptoSign)
@@ -825,24 +867,24 @@ class AuthWampCra(object):
     def __init__(self, **kw):
         # should put in checkconfig or similar
         for key in kw.keys():
-            if key not in [u'authextra', u'authid', u'authrole', u'secret']:
+            if key not in ['authextra', 'authid', 'authrole', 'secret']:
                 raise ValueError(
                     "Unexpected key '{}' for {}".format(key, self.__class__.__name__)
                 )
-        for key in [u'secret', u'authid']:
+        for key in ['secret', 'authid']:
             if key not in kw:
                 raise ValueError(
                     "Must provide '{}' for wampcra".format(key)
                 )
 
         self._args = kw
-        self._secret = kw.pop(u'secret')
-        if not isinstance(self._secret, six.text_type):
+        self._secret = kw.pop('secret')
+        if not isinstance(self._secret, str):
             self._secret = self._secret.decode('utf8')
 
     def on_challenge(self, session, challenge):
         key = self._secret.encode('utf8')
-        if u'salt' in challenge.extra:
+        if 'salt' in challenge.extra:
             key = auth.derive_key(
                 key,
                 challenge.extra['salt'],

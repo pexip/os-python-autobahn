@@ -25,8 +25,6 @@
 ###############################################################################
 
 
-from __future__ import absolute_import
-
 __all__ = (
     'Publication',
     'Subscription',
@@ -167,6 +165,9 @@ class Registration(object):
             return self.session._unregister(self)
         else:
             raise Exception("registration no longer active")
+
+    def __str__(self):
+        return 'Registration(id={0}, is_active={1}, procedure="{2}")'.format(self.id, self.active, self.procedure)
 
 
 class Endpoint(object):

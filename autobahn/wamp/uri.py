@@ -25,11 +25,8 @@
 ###############################################################################
 
 
-from __future__ import absolute_import
-
 import re
-
-import six
+from typing import Optional, Union
 
 from autobahn.util import public
 from autobahn.wamp.types import RegisterOptions, SubscribeOptions
@@ -43,7 +40,7 @@ __all__ = (
 )
 
 
-def convert_starred_uri(uri):
+def convert_starred_uri(uri: str):
     """
     Convert a starred URI to a standard WAMP URI and a detected matching
     policy. A starred URI is one that may contain the character '*' used
@@ -72,20 +69,20 @@ def convert_starred_uri(uri):
     matches a strict superset of the former!). This is one reason we don't use
     starred URIs for WAMP at the protocol level.
     """
-    assert(type(uri) == six.text_type)
+    assert(type(uri) == str)
 
-    cnt_stars = uri.count(u'*')
+    cnt_stars = uri.count('*')
 
     if cnt_stars == 0:
-        match = u'exact'
+        match = 'exact'
 
-    elif cnt_stars == 1 and uri[-1] == u'*':
-        match = u'prefix'
+    elif cnt_stars == 1 and uri[-1] == '*':
+        match = 'prefix'
         uri = uri[:-1]
 
     else:
-        match = u'wildcard'
-        uri = uri.replace(u'*', u'')
+        match = 'wildcard'
+        uri = uri.replace('*', '')
 
     return uri, match
 
@@ -133,7 +130,8 @@ class Pattern(object):
         This pattern is stricter than a general WAMP URI component since a valid Python identifier is required.
     """
 
-    def __init__(self, uri, target, options=None):
+    def __init__(self, uri: str, target: int, options: Optional[Union[SubscribeOptions, RegisterOptions]] = None,
+                 check_types: Optional[bool] = None):
         """
 
         :param uri: The URI or URI pattern, e.g. ``"com.myapp.product.<product:int>.update"``.
@@ -145,20 +143,35 @@ class Pattern(object):
 
         :param options: An optional options object
         :type options: None or RegisterOptions or SubscribeOptions
+
+        :param check_types: Enable automatic type checking against (Python 3.5+) type hints
+            specified on the ``endpoint`` callable. Types are checked at run-time on each
+            invocation of the ``endpoint`` callable. When a type mismatch occurs, the error
+            is forwarded to the callee code in ``onUserError`` override method of
+            :class:`autobahn.wamp.protocol.ApplicationSession`. An error
+            of type :class:`autobahn.wamp.exception.TypeCheckError` is also raised and
+            returned to the caller (via the router).
+        :type check_types: bool
+
         """
-        assert(type(uri) == six.text_type)
-        assert(len(uri) > 0)
-        assert(target in [Pattern.URI_TARGET_ENDPOINT,
-                          Pattern.URI_TARGET_HANDLER,
-                          Pattern.URI_TARGET_EXCEPTION])
+        assert (type(uri) == str)
+        assert (len(uri) > 0)
+        assert (target in [Pattern.URI_TARGET_ENDPOINT,
+                           Pattern.URI_TARGET_HANDLER,
+                           Pattern.URI_TARGET_EXCEPTION])
         if target == Pattern.URI_TARGET_ENDPOINT:
-            assert(options is None or type(options) == RegisterOptions)
+            assert (options is None or type(options) == RegisterOptions)
         elif target == Pattern.URI_TARGET_HANDLER:
-            assert(options is None or type(options) == SubscribeOptions)
+            assert (options is None or type(options) == SubscribeOptions)
         else:
             options = None
 
         components = uri.split('.')
+
+        _URI_COMP_CHARS = r'[^\s\.#]+'
+        # _URI_COMP_CHARS = r'[\da-z_]+'
+        # _URI_COMP_CHARS = r'[a-z0-9][a-z0-9_\-]*'
+
         pl = []
         nc = {}
         group_count = 0
@@ -167,26 +180,25 @@ class Pattern(object):
 
             match = Pattern._URI_NAMED_CONVERTED_COMPONENT.match(component)
             if match:
-                ctype = match.groups()[1]
-                if ctype not in ['string', 'int', 'suffix']:
-                    raise Exception("invalid URI")
+                name, comp_type = match.groups()
+                if comp_type not in ['str', 'string', 'int', 'suffix']:
+                    raise TypeError("invalid URI")
 
-                if ctype == 'suffix' and i != len(components) - 1:
-                    raise Exception("invalid URI")
+                if comp_type == 'suffix' and i != len(components) - 1:
+                    raise TypeError("invalid URI")
 
-                name = match.groups()[0]
                 if name in nc:
-                    raise Exception("invalid URI")
+                    raise TypeError("invalid URI")
 
-                if ctype in ['string', 'suffix']:
+                if comp_type in ['str', 'string', 'suffix']:
                     nc[name] = str
-                elif ctype == 'int':
+                elif comp_type == 'int':
                     nc[name] = int
                 else:
                     # should not arrive here
-                    raise Exception("logic error")
+                    raise TypeError("logic error")
 
-                pl.append("(?P<{0}>[a-z0-9_]+)".format(name))
+                pl.append("(?P<{}>{})".format(name, _URI_COMP_CHARS))
                 group_count += 1
                 continue
 
@@ -194,10 +206,10 @@ class Pattern(object):
             if match:
                 name = match.groups()[0]
                 if name in nc:
-                    raise Exception("invalid URI")
+                    raise TypeError("invalid URI")
 
                 nc[name] = str
-                pl.append("(?P<{0}>[a-z0-9_]+)".format(name))
+                pl.append("(?P<{}>{})".format(name, _URI_COMP_CHARS))
                 group_count += 1
                 continue
 
@@ -208,16 +220,16 @@ class Pattern(object):
 
             if component == '':
                 group_count += 1
-                pl.append("([a-z0-9][a-z0-9_\-]*)")
+                pl.append(r"({})".format(_URI_COMP_CHARS))
                 nc[group_count] = str
                 continue
 
-            raise Exception("invalid URI")
+            raise TypeError("invalid URI")
 
         if nc:
             # URI pattern
             self._type = Pattern.URI_TYPE_WILDCARD
-            p = "^" + "\.".join(pl) + "$"
+            p = "^" + r"\.".join(pl) + "$"
             self._pattern = re.compile(p)
             self._names = nc
         else:
@@ -228,6 +240,7 @@ class Pattern(object):
         self._uri = uri
         self._target = target
         self._options = options
+        self._check_types = check_types
 
     @public
     @property
@@ -285,7 +298,7 @@ class Pattern(object):
                     kwargs[key] = val
                 return args, kwargs
             else:
-                raise Exception("no match")
+                raise ValueError('no match')
 
     @public
     def is_endpoint(self):
@@ -319,7 +332,7 @@ class Pattern(object):
 
 
 @public
-def register(uri, options=None):
+def register(uri: Optional[str], options: Optional[RegisterOptions] = None, check_types: Optional[bool] = None):
     """
     Decorator for WAMP procedure endpoints.
 
@@ -328,25 +341,31 @@ def register(uri, options=None):
 
     :param options:
     :type options: None or RegisterOptions
+
+    :param check_types: Enable automatic type checking against (Python 3.5+) type hints
+        specified on the ``endpoint`` callable. Types are checked at run-time on each
+        invocation of the ``endpoint`` callable. When a type mismatch occurs, the error
+        is forwarded to the callee code in ``onUserError`` override method of
+        :class:`autobahn.wamp.protocol.ApplicationSession`. An error
+        of type :class:`autobahn.wamp.exception.TypeCheckError` is also raised and
+        returned to the caller (via the router).
+    :type check_types: bool
     """
     def decorate(f):
         assert(callable(f))
         if uri is None:
-            if six.PY2:
-                real_uri = u'{}'.format(f.func_name)
-            else:
-                real_uri = u'{}'.format(f.__name__)
+            real_uri = '{}'.format(f.__name__)
         else:
             real_uri = uri
         if not hasattr(f, '_wampuris'):
             f._wampuris = []
-        f._wampuris.append(Pattern(real_uri, Pattern.URI_TARGET_ENDPOINT, options))
+        f._wampuris.append(Pattern(real_uri, Pattern.URI_TARGET_ENDPOINT, options, check_types))
         return f
     return decorate
 
 
 @public
-def subscribe(uri, options=None):
+def subscribe(uri: Optional[str], options: Optional[SubscribeOptions] = None, check_types: Optional[bool] = None):
     """
     Decorator for WAMP event handlers.
 
@@ -355,18 +374,27 @@ def subscribe(uri, options=None):
 
     :param options:
     :type options: None or SubscribeOptions
+
+    :param check_types: Enable automatic type checking against (Python 3.5+) type hints
+        specified on the ``endpoint`` callable. Types are checked at run-time on each
+        invocation of the ``endpoint`` callable. When a type mismatch occurs, the error
+        is forwarded to the callee code in ``onUserError`` override method of
+        :class:`autobahn.wamp.protocol.ApplicationSession`. An error
+        of type :class:`autobahn.wamp.exception.TypeCheckError` is also raised and
+        returned to the caller (via the router).
+    :type check_types: bool
     """
     def decorate(f):
         assert(callable(f))
         if not hasattr(f, '_wampuris'):
             f._wampuris = []
-        f._wampuris.append(Pattern(uri, Pattern.URI_TARGET_HANDLER, options))
+        f._wampuris.append(Pattern(uri, Pattern.URI_TARGET_HANDLER, options, check_types))
         return f
     return decorate
 
 
 @public
-def error(uri):
+def error(uri: str):
     """
     Decorator for WAMP error classes.
     """
