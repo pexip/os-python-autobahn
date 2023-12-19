@@ -24,7 +24,7 @@ Build-Depends-Indep:
  python3-hyperlink,
 # python3-mnemonic,
  python3-msgpack (>= 1.0.2),
-# python3-nacl,
+ python3-nacl,
  python3-openssl,
  python3-passlib,
  python3-pytest (>= 6.2),
