@@ -2,7 +2,7 @@
 #
 # The MIT License (MIT)
 #
-# Copyright (c) Crossbar.io Technologies GmbH
+# Copyright (c) typedef int GmbH
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -354,8 +354,7 @@ def run(components, start_loop=True, log_level='info'):
     #   import signal
     #   signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-    @asyncio.coroutine
-    def nicely_exit(signal):
+    async def nicely_exit(signal):
         log.info("Shutting down due to {signal}", signal=signal)
 
         try:

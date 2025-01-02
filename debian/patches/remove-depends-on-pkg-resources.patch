@@ -1,0 +1,16 @@
+Description: Remove depends on pkg-resources
+Author: Thomas Goirand <zigo@debian.org>
+Bug-Debian: https://bugs.debian.org/1083599
+Forwarded: no
+Last-Update: 2025-01-02
+
+--- python-autobahn-23.1.2+dfsg1.orig/setup.py
++++ python-autobahn-23.1.2+dfsg1/setup.py
+@@ -266,7 +266,6 @@ setup(
+         'txaio>=21.2.1',        # MIT license (https://github.com/crossbario/txaio)
+         'cryptography>=3.4.6',  # BSD *or* Apache license (https://github.com/pyca/cryptography)
+         'hyperlink>=21.0.0',    # MIT license (https://github.com/python-hyper/hyperlink)
+-        'setuptools',           # MIT license (https://github.com/pypa/setuptools)
+     ],
+     extras_require={
+         'all': extras_require_all,
