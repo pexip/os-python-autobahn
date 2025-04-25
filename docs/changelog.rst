@@ -5,6 +5,32 @@
 Changelog
 =========
 
+23.1.2
+------
+
+- fix: monkey patch web3/eth_abi for python 3.11
+
+23.1.1
+------
+
+- fix: support for Python up to v3.11
+- fix: update GitHub CI
+- fix: copyright transferred to typedef int GmbH - no license change!
+- fix: remove coverage crap
+
+22.12.1
+-------
+
+* new: expand WAMP Flatbuffers schemata (session ID in each message for MUXing)
+* new: update flatc v22.12.06 and regenerate WAMP Flatbuffers type libraries
+* fix: Twisted 22.10.0 incompability (#1604)
+* fix: Rapid Cancelling Of Tasks Can Cause InvalidStateError (#1600)
+* fix: identify_realm_name_category (#1590)
+* fix: support Python 3.11 (#1599)
+* fix: building _nvx_utf8validator extension on non-x86 systems (#1596)
+* fix: asyncio rawsocket protocol transport details (#1592)
+* new: expand EIP712AuthorityCertificate; more tests
+
 22.7.1
 ------
 

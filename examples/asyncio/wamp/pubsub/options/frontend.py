@@ -2,7 +2,7 @@
 #
 # The MIT License (MIT)
 #
-# Copyright (c) Crossbar.io Technologies GmbH
+# Copyright (c) typedef int GmbH
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -46,8 +46,7 @@ class Component(ApplicationSession):
             if self.received > 5:
                 self.leave()
 
-        await self.subscribe(on_event, 'com.myapp.topic1',
-                                  options=SubscribeOptions(details_arg='details'))
+        await self.subscribe(on_event, 'com.myapp.topic1', options=SubscribeOptions(details_arg='details'))
 
     def onDisconnect(self):
         asyncio.get_event_loop().stop()
