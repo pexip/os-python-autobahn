@@ -2,7 +2,7 @@
 #
 # The MIT License (MIT)
 #
-# Copyright (c) Crossbar.io Technologies GmbH
+# Copyright (c) typedef int GmbH
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -80,7 +80,7 @@ else:
 extras_require_serialization.extend([
     'cbor2>=5.2.0',             # MIT license
     'py-ubjson>=0.16.1',        # Apache 2.0 license
-    'flatbuffers>=1.12',        # Apache 2.0 license
+    'flatbuffers>=22.12.6',     # Apache 2.0 license
 ])
 
 # TLS transport encryption
@@ -112,6 +112,8 @@ cffi_modules = []
 if 'AUTOBAHN_USE_NVX' not in os.environ or os.environ['AUTOBAHN_USE_NVX'] not in ['0', 'false']:
     cffi_modules.append('autobahn/nvx/_utf8validator.py:ffi')
 
+# https://peps.python.org/pep-0440/#direct-references
+# https://stackoverflow.com/a/63688209/884770
 extras_require_xbr = [
     # XBR contracts and ABI file bundle
     'xbr>=21.2.1',              # Apache 2.0
@@ -123,13 +125,20 @@ extras_require_xbr = [
     'cbor2>=5.2.0',             # MIT license
     'zlmdb>=21.2.1',            # MIT license
     'twisted>=20.3.0',          # MIT license
-    'web3>=5.29.0',             # MIT license
+
+    # ImportError: cannot import name 'getargspec' from 'inspect'
+    # https://github.com/ethereum/web3.py/issues/2704#issuecomment-1369041219
+    # pip install git+https://github.com/ethereum/web3.py.git
+    # 'web3>=5.31.3',             # MIT license
+    'web3[ipfs] @ git+https://github.com/ethereum/web3.py.git#v6.0.0-beta.9#egg=web3',
 
     # the following is needed for EIP712 ("signed typed data"):
     'rlp>=2.0.1',               # MIT license
     'py-eth-sig-utils>=0.4.0',  # MIT license (https://github.com/rmeissner/py-eth-sig-utils)
     'py-ecc>=5.1.0',            # MIT license (https://github.com/ethereum/py_ecc)
-    'eth-abi>=2.1.1',           # MIT license (https://github.com/ethereum/eth-abi)
+
+    # 'eth-abi>=2.1.1',           # MIT license (https://github.com/ethereum/eth-abi)
+    'eth-abi @ git+https://github.com/ethereum/eth-abi.git@v4.0.0-beta.2#egg=eth-abi',
 
     # the following is needed (at least) for BIP32/39 mnemonic processing
     'mnemonic>=0.19',           # MIT license (https://github.com/trezor/python-mnemonic)
@@ -247,8 +256,8 @@ setup(
     description='WebSocket client & server library, WAMP real-time framework',
     long_description=docstr,
     license='MIT License',
-    author='Crossbar.io Technologies GmbH',
-    url='http://crossbar.io/autobahn',
+    author='typedef int GmbH',
+    url='https://github.com/crossbario/autobahn-python',
     project_urls={
         'Source': 'https://github.com/crossbario/autobahn-python',
     },
@@ -303,6 +312,7 @@ setup(
                  "Programming Language :: Python :: 3.8",
                  "Programming Language :: Python :: 3.9",
                  "Programming Language :: Python :: 3.10",
+                 "Programming Language :: Python :: 3.11",
                  "Programming Language :: Python :: Implementation :: CPython",
                  "Programming Language :: Python :: Implementation :: PyPy",
                  "Topic :: Internet",

@@ -1,3 +1,24 @@
+python-autobahn (23.1.2+dfsg1-2) unstable; urgency=medium
+
+  * Remove depends on python3-pkg-resources (Closes: #1083599).
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 02 Jan 2025 14:47:47 +0100
+
+python-autobahn (23.1.2+dfsg1-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Removed versions of (build-)depends when satisfied in Bookworm.
+  * Switch to pybuild (Closes: #1090462).
+  * Blacklist test_wamp_server.
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 19 Dec 2024 11:55:24 +0100
+
+python-autobahn (22.7.1+dfsg1-3) unstable; urgency=medium
+
+  * Cleans better (Closes: #1046628).
+
+ -- Thomas Goirand <zigo@debian.org>  Fri, 18 Aug 2023 10:10:33 +0200
+
 python-autobahn (22.7.1+dfsg1-2+pexip24u5) pexip-bookworm; urgency=medium
 
   * New versioning scheme

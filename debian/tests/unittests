@@ -9,5 +9,5 @@ PYTHON3S=$(py3versions -vs)
 for i in ${PYTHON3S} ; do
 	python${i} setup.py install --install-layout=deb --root ${CWD}/debian/tmp
 	PYTHONPATH=${CWD}/debian/tmp/usr/lib/python3/dist-packages \
-		python$i -m pytest -Wignore -v --ignore=./autobahn/twisted --ignore=./autobahn/wamp --ignore=./autobahn/websocket --ignore=./autobahn/xbr autobahn
+		python$i -m pytest -Wignore -v --ignore=./autobahn/twisted --ignore=./autobahn/wamp --ignore=./autobahn/websocket --ignore=./autobahn/xbr autobahn -k 'not test_wamp_server'
 done

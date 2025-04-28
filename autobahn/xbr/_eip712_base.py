@@ -2,7 +2,7 @@
 #
 # The MIT License (MIT)
 #
-# Copyright (c) Crossbar.io Technologies GmbH
+# Copyright (c) typedef int GmbH
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,23 @@ from binascii import a2b_hex
 from py_eth_sig_utils import signing
 
 _EIP712_SIG_LEN = 32 + 32 + 1
+
+
+def _hash(data) -> bytes:
+    """
+    keccak256(abi.encode(
+            EIP712_MEMBER_REGISTER_TYPEHASH,
+            obj.chainId,
+            obj.verifyingContract,
+            obj.member,
+            obj.registered,
+            keccak256(bytes(obj.eula)),
+            keccak256(bytes(obj.profile))
+        ));
+
+    :param data:
+    :return:
+    """
 
 
 def sign(eth_privkey: bytes, data: Dict[str, Any]) -> bytes:

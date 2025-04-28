@@ -2,7 +2,7 @@
 #
 # The MIT License (MIT)
 #
-# Copyright (c) Crossbar.io Technologies GmbH
+# Copyright (c) typedef int GmbH
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -45,8 +45,8 @@ class Component(ApplicationSession):
         counter = 0
         while True:
             publication = await self.publish('com.myapp.topic1',
-                                                  counter,
-                                                  options=PublishOptions(acknowledge=True, exclude_me=False))
+                                             counter,
+                                             options=PublishOptions(acknowledge=True, exclude_me=False))
             print("Event published with publication ID {}".format(publication.id))
             counter += 1
             await asyncio.sleep(1)
