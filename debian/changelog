@@ -1,3 +1,9 @@
+python-autobahn (23.1.2+dfsg1-2+pexip25u1) pexip-trixie; urgency=medium
+
+  * Initial trixie build
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Tue, 29 Apr 2025 22:52:12 +0100
+
 python-autobahn (23.1.2+dfsg1-2) unstable; urgency=medium
 
   * Remove depends on python3-pkg-resources (Closes: #1083599).
